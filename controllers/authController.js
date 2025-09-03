@@ -40,6 +40,43 @@ exports.register = async (req, res) => {
   }
 };
 
+
+
+exports.registerAdmin = async (req, res) => {
+  try {
+    const { fullName, email, password } = req.body;
+
+    if (!fullName || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Check if email already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    // Force role = admin
+    const user = await User.create({
+      fullName,
+      email,
+      password,
+      role: "admin",  // 👈 locked role
+    });
+
+    res.status(201).json({
+      _id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
 // @desc    Login user
 exports.login = async (req, res) => {
   try {
