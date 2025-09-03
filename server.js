@@ -5,7 +5,7 @@ const transactionRoutes = require('./routes/transaction');
 const userDashboardRoutes = require("./routes/user");
 const adminRoutes = require("./routes/admin");
 const { protect } = require("./middleware/auth");
-const adminRoutes = require("./routes/adminRoutes");
+
 
 const cors = require("cors");
 
