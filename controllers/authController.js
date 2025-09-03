@@ -77,6 +77,34 @@ exports.registerAdmin = async (req, res) => {
 };
 
 
+// @desc    Login admin
+exports.loginAdmin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email, role: "admin" });
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized as admin" });
+    }
+
+    if (user && (await user.matchPassword(password))) {
+      res.json({
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        token: generateToken(user._id),
+      });
+    } else {
+      res.status(401).json({ message: "Invalid email or password" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
 // @desc    Login user
 exports.login = async (req, res) => {
   try {
@@ -131,6 +159,41 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
+
+
+// @desc    Forgot password (Admin only)
+exports.forgotAdminPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email, role: "admin" });
+    if (!user) return res.status(404).json({ message: "Admin not found" });
+
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetPasswordToken = resetTokenHash;
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 min
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = `${req.protocol}://${req.get("host")}/api/auth/admin/reset-password/${resetToken}`;
+    const message = `You requested an admin password reset. Make a PUT request to: \n\n ${resetUrl}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Admin Password Reset Request",
+      text: message,
+    });
+
+    res.json({ message: "Reset email sent" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+
 // @desc    Reset password
 exports.resetPassword = async (req, res) => {
   try {
@@ -154,6 +217,34 @@ exports.resetPassword = async (req, res) => {
     await user.save();
 
     res.json({ message: "Password reset successful" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+// @desc    Reset admin password
+exports.resetAdminPassword = async (req, res) => {
+  try {
+    const resetTokenHash = crypto.createHash("sha256").update(req.params.token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: resetTokenHash,
+      resetPasswordExpire: { $gt: Date.now() },
+      role: "admin",
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ message: "Admin password reset successful" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
