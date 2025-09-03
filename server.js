@@ -4,6 +4,8 @@ const connectDB = require("./config/database");
 const transactionRoutes = require('./routes/transaction');
 const userDashboardRoutes = require("./routes/user");
 const adminRoutes = require("./routes/admin");
+const { protect } = require("./middleware/auth");
+const adminRoutes = require("./routes/adminRoutes");
 
 const cors = require("cors");
 
@@ -26,7 +28,7 @@ app.use(express.json());
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/user/dashboard", userDashboardRoutes);
 app.use('/api/transactions', transactionRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/api/admin", protect, adminRoutes);
 
 // --- Optional: log injected env vars safely ---
 console.log("BASE_URL:", process.env.BASE_URL || "(not set)");
