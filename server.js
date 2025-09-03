@@ -1,6 +1,10 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const connectDB = require("./config/database");
+const transactionRoutes = require('./routes/transaction');
+const userDashboardRoutes = require("./routes/user");
+const adminRoutes = require("./routes/admin");
+
 const cors = require("cors");
 
 dotenv.config();
@@ -20,6 +24,9 @@ app.use(express.json());
 
 // --- Hardcoded relative route paths only ---
 app.use("/api/auth", require("./routes/auth"));
+app.use("/api/user/dashboard", userDashboardRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use("/api/admin", adminRoutes);
 
 // --- Optional: log injected env vars safely ---
 console.log("BASE_URL:", process.env.BASE_URL || "(not set)");

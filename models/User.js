@@ -1,5 +1,3 @@
-
-// models/userModel.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -19,7 +17,6 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: function () {
-        // phone required only for normal users, not admin
         return this.role === "user";
       },
     },
@@ -27,15 +24,22 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 6,
-      select: false, // 👈 important: exclude password from query results by default
+      select: false,
     },
     role: {
       type: String,
       enum: ["user", "admin"],
-      default: "user", // 👈 new signups default to user unless backend sets admin
+      default: "user",
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+
+    // 🔹 Link user to their primary account
+    accountId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Account', // Make sure you have an Account model
+      required: function() { return this.role === 'user'; }
+    }
   },
   { timestamps: true }
 );
@@ -53,9 +57,3 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 };
 
 module.exports = mongoose.model("User", userSchema);
-
-// Hash password before saving
-
-
-
-
