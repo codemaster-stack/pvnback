@@ -1,7 +1,7 @@
 // routes/transactionRoutes.js
 const express = require('express');
 const { getUserTransactions,  transfer} = require('../controllers/transactionController');
-const { protect } = require('../middleware/authMiddleware'); // your JWT auth middleware
+const { protect } = require('../middleware/auth'); // your JWT auth middleware
 
 const router = express.Router();
 

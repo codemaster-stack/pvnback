@@ -1,7 +1,7 @@
 // routes/userDashboard.js
 const express = require("express");
-const { getUserAccounts, deposit, withdraw } = require("../controllers/userController");
-const { protect } = require("../middleware/authMiddleware"); // make sure you have this
+const { getUserAccounts, deposit, withdraw, getAccountDetails } = require("../controllers/userController");
+const { protect } = require("../middleware/auth"); // make sure you have this
 
 
 const router = express.Router();

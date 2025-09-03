@@ -4,7 +4,7 @@ const Account = require("../models/Account"); // if needed
 const sendEmail = require("../utils/sendEmail");
 
 // GET all users
-exports.getUsers = async (req, res) => {
+exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find({ role: { $ne: "admin" } }).select("-password");
     res.status(200).json(users);
@@ -56,7 +56,7 @@ exports.deleteUser = async (req, res) => {
 };
 
 // Admin funds user account
-exports.fundUser = async (req, res) => {
+exports.fundUserAccount = async (req, res) => {
   try {
     const { userId, amount } = req.body;
     if (!amount || amount <= 0) return res.status(400).json({ message: "Invalid amount" });
@@ -80,7 +80,7 @@ exports.fundUser = async (req, res) => {
 };
 
 // Admin sends email
-exports.sendEmail = async (req, res) => {
+exports.sendEmailToUser = async (req, res) => {
   try {
     const { userId, subject, message } = req.body;
     if (!subject || !message) return res.status(400).json({ message: "Subject and message required" });

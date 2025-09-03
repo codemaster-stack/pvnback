@@ -5,7 +5,6 @@ const accountSchema = new mongoose.Schema({
   accountNumber: {
     type: String,
     required: true,
-    unique: true,
     match: [/^\d{10,12}$/, 'Account number must be 10-12 digits']
   },
   routingNumber: {
@@ -258,7 +257,7 @@ const accountSchema = new mongoose.Schema({
 });
 
 // Indexes
-accountSchema.index({ accountNumber: 1 });
+accountSchema.index({ accountNumber: 1 }, { unique: true });
 accountSchema.index({ userId: 1 });
 accountSchema.index({ status: 1 });
 accountSchema.index({ accountType: 1 });

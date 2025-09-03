@@ -1,14 +1,10 @@
 const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
-  // Transaction Identification
   transactionId: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
-  
-  // Account Information
   fromAccountId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account',
@@ -18,28 +14,10 @@ const transactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Account'
   },
-  
-  // Transaction Details
   type: {
     type: String,
     required: true,
-    enum: [
-      'deposit',
-      'withdrawal',
-      'transfer',
-      'payment',
-      'fee',
-      'interest',
-      'refund',
-      'check',
-      'atm',
-      'debit-card',
-      'credit-card',
-      'wire-transfer',
-      'ach',
-      'direct-deposit',
-      'overdraft'
-    ]
+    enum: ['deposit','withdrawal','transfer','payment','fee','interest','refund','check','atm','debit-card','credit-card','wire-transfer','ach','direct-deposit','overdraft']
   },
   
   category: {

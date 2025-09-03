@@ -1,7 +1,7 @@
 // controllers/userDashboardController.js
-const User = require("../models/userModel");
-const Account = require("../models/accountModel");
-const Transaction = require("../models/transactionModel");
+const User = require("../models/User");
+const Account = require("../models/Account");
+const Transaction = require("../models/Transaction");
 
 // @desc    Get all accounts for logged-in user
 // @route   GET /api/user/dashboard/accounts
