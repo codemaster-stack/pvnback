@@ -168,10 +168,15 @@ const app = express();
 // ✅ CORS setup
 app.use(cors({
   origin: "https://pvbankonline.vercel.app",  // frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
 }));
 
+// ✅ handle preflight
+app.options("*", cors());
+
 app.use(express.json());
+
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
