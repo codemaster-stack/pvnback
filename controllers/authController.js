@@ -78,16 +78,17 @@ exports.registerAdmin = async (req, res) => {
 
 
 // @desc    Login admin
+// @desc    Login admin
 exports.loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email, role: "admin" });
+    const user = await User.findOne({ email, role: "admin" }).select("+password");
     if (!user) {
       return res.status(401).json({ message: "Not authorized as admin" });
     }
 
-    if (user && (await user.matchPassword(password))) {
+    if (await user.matchPassword(password)) {
       res.json({
         _id: user._id,
         fullName: user.fullName,
@@ -105,18 +106,20 @@ exports.loginAdmin = async (req, res) => {
 
 
 
+
 // @desc    Login user
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password");
     if (user && (await user.matchPassword(password))) {
       res.json({
         _id: user._id,
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
+        role: user.role,
         token: generateToken(user._id),
       });
     } else {
@@ -126,6 +129,7 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // @desc    Forgot password - send reset link
 exports.forgotPassword = async (req, res) => {
