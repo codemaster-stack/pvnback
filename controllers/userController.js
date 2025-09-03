@@ -156,3 +156,27 @@ exports.withdraw = async (req, res) => {
     res.status(500).json({ message: "Server error processing withdrawal." });
   }
 };
+
+
+exports.getUserProfile = async (req, res) => {
+    try {
+        const userId = req.user.id; // set by your protect middleware
+        const user = await User.findById(userId).select('fullName email');
+
+        const account = await Account.findOne({ userId }); // get primary account
+        if (!user || !account) {
+            return res.status(404).json({ message: 'User or account not found' });
+        }
+
+        res.json({
+            user: {
+                fullName: user.fullName,
+                accountNumber: account.accountNumber,
+                balance: account.balance
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
