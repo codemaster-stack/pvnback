@@ -34,12 +34,8 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: String,
     resetPasswordExpire: Date,
 
-    // 🔹 Link user to their primary account
-    accountId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Account', // Make sure you have an Account model
-      required: function() { return this.role === 'user'; }
-    }
+    // 🔹 REMOVED: accountId field - no longer needed
+    
   },
   { timestamps: true }
 );
