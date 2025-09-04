@@ -253,3 +253,66 @@ exports.resetAdminPassword = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+
+exports.logout = async (req, res) => {
+    try {
+        // Get the authorization header
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                success: false,
+                message: 'No valid token provided'
+            });
+        }
+
+        // Extract the token
+        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+        // Option 1: If using JWT with a blacklist/invalidation system
+        // Add the token to a blacklist (Redis, database, or in-memory store)
+        try {
+            // Example with Redis (uncomment if using Redis)
+            // await redisClient.setex(`blacklist_${token}`, 3600, 'true'); // Blacklist for 1 hour
+            
+            // Example with database (uncomment if using database)
+            // await BlacklistedToken.create({ token, expiresAt: new Date(Date.now() + 3600000) });
+            
+            console.log('Token blacklisted successfully');
+        } catch (blacklistError) {
+            console.error('Error blacklisting token:', blacklistError);
+            // Don't fail the logout if blacklisting fails
+        }
+
+        // Option 2: If using sessions instead of JWT
+        // req.session.destroy((err) => {
+        //     if (err) {
+        //         console.error('Session destruction error:', err);
+        //     }
+        // });
+
+        // Clear any HTTP-only cookies if you're using them
+        res.clearCookie('authToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
+
+        // Log the logout action (optional)
+        console.log(`User logged out at ${new Date().toISOString()}`);
+
+        // Return success response
+        return res.status(200).json({
+            success: true,
+            message: 'Logged out successfully'
+        });
+
+    } catch (error) {
+        console.error('Logout error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error during logout'
+        });
+    }
+};

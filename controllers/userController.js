@@ -180,3 +180,76 @@ exports.getUserProfile = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+
+
+
+// Express.js logout route handler
+// POST /api/auth/logout
+
+
+// Alternative version if using middleware for token verification
+exports.logoutWithMiddleware = async (req, res) => {
+    try {
+        // If you have middleware that already verified the token and added user to req
+        const userId = req.user?.id;
+        const token = req.token; // Assuming middleware adds the token to req
+
+        if (userId) {
+            // Log user-specific logout
+            console.log(`User ${userId} logged out at ${new Date().toISOString()}`);
+            
+            // Optional: Update last logout time in database
+            // await User.findByIdAndUpdate(userId, { lastLogout: new Date() });
+        }
+
+        // Blacklist the token
+        if (token) {
+            // Add to blacklist (implement according to your setup)
+            // await blacklistToken(token);
+        }
+
+        // Clear cookies
+        res.clearCookie('authToken');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Logged out successfully'
+        });
+
+    } catch (error) {
+        console.error('Logout error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error during logout'
+        });
+    }
+};
+
+// Route setup (add this to your routes file)
+// router.post('/api/auth/logout', logout);
+
+// If using Express.js with middleware:
+// router.post('/api/auth/logout', authenticateToken, logoutWithMiddleware);
+
+// Middleware example for token verification (if needed)
+exports.authenticateToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ message: 'Access token required' });
+    }
+
+    // Verify JWT token
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: 'Invalid or expired token' });
+        }
+        
+        req.user = user;
+        req.token = token;
+        next();
+    });
+};
+
