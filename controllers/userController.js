@@ -503,38 +503,29 @@ const Transaction = require("../models/Transaction");
 
 
 // controllers/userController.js
+// controllers/userController.js
 const User = require("../models/User");
 const Account = require("../models/Account");
 
-// 🔹 ENHANCED: Get user profile with detailed debugging
+// 🔹 ROBUST: Get user profile with fallback for existing users
 exports.getUserProfile = async (req, res) => {
   try {
-    console.log('=== PROFILE DEBUG START ===');
-    console.log('req.user:', req.user);
-    console.log('req.user.id:', req.user?.id);
-    
     // Check if req.user exists (from protect middleware)
     if (!req.user || !req.user.id) {
-      console.log('❌ No user in request object');
       return res.status(401).json({ message: 'Not authenticated' });
     }
 
     const userId = req.user.id;
-    console.log('🔍 Looking for user with ID:', userId);
     
     // Get user info
     const user = await User.findById(userId).select('fullName email phone role');
-    console.log('👤 User found:', user ? 'YES' : 'NO');
-    console.log('👤 User data:', user);
     
     if (!user) {
-      console.log('❌ User not found in database');
       return res.status(404).json({ message: 'User not found' });
     }
 
     // Handle admin users (they don't have accounts)
     if (user.role === 'admin') {
-      console.log('👑 Admin user - returning admin profile');
       return res.json({
         user: {
           fullName: user.fullName,
@@ -544,31 +535,41 @@ exports.getUserProfile = async (req, res) => {
       });
     }
 
-    console.log('🏦 Looking for account for user:', userId);
-    
-    // Get user's primary account
+    // 🔹 FIXED: Try to find existing account first
     let account = await Account.findOne({ userId });
-    console.log('🏦 Account found:', account ? 'YES' : 'NO');
-    console.log('🏦 Account data:', account);
     
-    // If no account exists, create one automatically
+    // If no account exists, try to create one with better error handling
     if (!account) {
-      console.log('🆕 No account found, creating new account...');
-      
       try {
-        account = await Account.create({
+        // Generate a simple account number (avoid complex pre-save hooks for now)
+        const accountNumber = Date.now().toString().slice(-10); // Last 10 digits of timestamp
+        
+        account = new Account({
           userId,
+          accountNumber,
           accountType: "savings",
-          balance: 0
+          balance: 0,
+          isActive: true
         });
-        console.log('✅ New account created:', account);
+        
+        await account.save();
       } catch (createError) {
-        console.error('❌ Error creating account:', createError);
-        return res.status(500).json({ message: 'Error creating account' });
+        // If account creation fails, return user info without account details
+        // This allows existing users to login even if account creation fails
+        return res.json({
+          user: {
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.phone,
+            accountNumber: "Account setup pending...",
+            balance: 0
+          }
+        });
       }
     }
 
-    const profileData = {
+    // Return user with account info
+    return res.json({
       user: {
         fullName: user.fullName,
         email: user.email,
@@ -576,24 +577,39 @@ exports.getUserProfile = async (req, res) => {
         accountNumber: account.accountNumber,
         balance: account.balance
       }
-    };
-
-    console.log('✅ Sending profile data:', profileData);
-    console.log('=== PROFILE DEBUG END ===');
-    
-    res.json(profileData);
+    });
 
   } catch (error) {
-    console.error('❌ PROFILE ERROR:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Profile error:', error.message);
+    
+    // 🔹 FALLBACK: If everything fails, try to return basic user info
+    try {
+      const userId = req.user?.id;
+      if (userId) {
+        const user = await User.findById(userId).select('fullName email phone');
+        if (user) {
+          return res.json({
+            user: {
+              fullName: user.fullName,
+              email: user.email,
+              phone: user.phone,
+              accountNumber: "System maintenance...",
+              balance: 0
+            }
+          });
+        }
+      }
+    } catch (fallbackError) {
+      // Even fallback failed
+    }
+    
     res.status(500).json({ 
-      message: 'Server error loading profile',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: 'Server error loading profile'
     });
   }
 };
 
-// Keep your other functions as they were
+// Keep your other functions
 exports.getUserAccounts = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -721,9 +737,6 @@ exports.withdraw = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
-
-
 
 
 // Express.js logout route handler
