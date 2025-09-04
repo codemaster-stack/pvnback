@@ -10,6 +10,7 @@ const {
   forgotAdminPassword, 
   resetAdminPassword,
 } = require("../controllers/authController");
+const { logout } = require("../controllers/userController");
 
 const router = express.Router();
 
@@ -22,5 +23,6 @@ router.post("/admin/register", registerAdmin);
 router.post("/admin/login", loginAdmin);
 router.post("/admin/forgot-password", forgotAdminPassword);
 router.put("/admin/reset-password/:token", resetAdminPassword);
+router.post('/api/auth/logout', logout);
 
 module.exports = router;

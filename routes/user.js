@@ -1,6 +1,6 @@
 // routes/userDashboard.js
 const express = require("express");
-const { getUserAccounts, deposit, withdraw, getAccountDetails, getUserProfile, logout } = require("../controllers/userController");
+const { getUserAccounts, deposit, withdraw, getAccountDetails, getUserProfile, } = require("../controllers/userController");
 const { protect } = require("../middleware/auth"); // make sure you have this
 
 
@@ -22,7 +22,6 @@ router.post("/account/:accountId/withdraw", protect, withdraw);
 
 router.get('/profile', protect, getUserProfile);
 
-router.post('/api/auth/logout', logout);
 
 
 module.exports = router;
