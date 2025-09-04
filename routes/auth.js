@@ -9,7 +9,6 @@ const {
   loginAdmin, 
   forgotAdminPassword, 
   resetAdminPassword,
-  logout
 } = require("../controllers/authController");
 
 const router = express.Router();
@@ -17,7 +16,6 @@ const router = express.Router();
 // Public routes
 router.post("/register", register);
 router.post("/login", login);
-router.post('/api/auth/logout', logout);
 router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:token", resetPassword);
 router.post("/admin/register", registerAdmin);
