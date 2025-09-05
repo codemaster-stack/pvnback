@@ -8,7 +8,7 @@ const {
   fundUserAccount
 } = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
-const { replyToMessage } = require('../controllers/userController');
+const { replyToMessage, getContactMessages } = require('../controllers/userController');
 const { getActiveChatSessions, getUserChatHistory, getChatStats } = require("../controllers/chatController");
 
 const router = express.Router();
@@ -42,6 +42,8 @@ router.get('/admin/user/:userId', adminAuth, getUserChatHistory);
 
 // Get chat statistics (admin only)
 router.get('/admin/stats', adminAuth, getChatStats);
+
+router. get('/contact-messages', adminAuth, getContactMessages);
 
 
 module.exports = router;
