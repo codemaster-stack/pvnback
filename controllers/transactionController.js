@@ -11,19 +11,15 @@ exports.getUserTransactions = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Get user without populate to avoid the error
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    // Find account by userId instead of user.accountId
+    const account = await Account.findOne({ userId: userId });
+    if (!account) {
+      return res.status(404).json({ message: 'No account found for user' });
     }
 
-    if (!user.accountId) {
-      return res.status(404).json({ message: 'No account linked to user' });
-    }
-
-    // Use your existing static method from Transaction schema
-    const transactions = await Transaction.findByAccountId(user.accountId);
-
+    // Get transactions for this account
+    const transactions = await Transaction.findByAccountId(account._id);
+    
     // Convert to summary format
     const summary = transactions.map(txn => txn.getSummary());
 
@@ -34,12 +30,10 @@ exports.getUserTransactions = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching transactions:', error);
-    res.status(500).json({ 
-      message: 'Server error fetching transactions',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ message: 'Server error fetching transactions' });
   }
 };
+
 
 // controllers/userDashboardController.js
 exports.transfer = async (req, res) => {
