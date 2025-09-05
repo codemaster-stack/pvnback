@@ -2,6 +2,7 @@
 // const User = require("../models/User");
 // const Account = require("../models/Account");
 const Transaction = require("../models/Transaction");
+const ContactMessage = require('../models/Contact');
 
 // @desc    Get all accounts for logged-in user
 // @route   GET /api/user/dashboard/accounts
@@ -366,135 +367,57 @@ const Transaction = require("../models/Transaction");
 
 
 
-// // Express.js logout route handler
-// // POST /api/auth/logout
+// controllers/contactController.js
 
-// exports.logout = async (req, res) => {
-//     try {
-//         // Get the authorization header
-//         const authHeader = req.headers.authorization;
+
+// User submits contact form
+exports.submitContactMessage = async (req, res) => {
+    try {
+        const { subject, message } = req.body;
+        const userId = req.user.id;
         
-//         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-//             return res.status(401).json({
-//                 success: false,
-//                 message: 'No valid token provided'
-//             });
-//         }
-
-//         // Extract the token
-//         const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-//         // Option 1: If using JWT with a blacklist/invalidation system
-//         // Add the token to a blacklist (Redis, database, or in-memory store)
-//         try {
-//             // Example with Redis (uncomment if using Redis)
-//             // await redisClient.setex(`blacklist_${token}`, 3600, 'true'); // Blacklist for 1 hour
-            
-//             // Example with database (uncomment if using database)
-//             // await BlacklistedToken.create({ token, expiresAt: new Date(Date.now() + 3600000) });
-            
-//             console.log('Token blacklisted successfully');
-//         } catch (blacklistError) {
-//             console.error('Error blacklisting token:', blacklistError);
-//             // Don't fail the logout if blacklisting fails
-//         }
-
-//         // Option 2: If using sessions instead of JWT
-//         // req.session.destroy((err) => {
-//         //     if (err) {
-//         //         console.error('Session destruction error:', err);
-//         //     }
-//         // });
-
-//         // Clear any HTTP-only cookies if you're using them
-//         res.clearCookie('authToken', {
-//             httpOnly: true,
-//             secure: process.env.NODE_ENV === 'production',
-//             sameSite: 'strict'
-//         });
-
-//         // Log the logout action (optional)
-//         console.log(`User logged out at ${new Date().toISOString()}`);
-
-//         // Return success response
-//         return res.status(200).json({
-//             success: true,
-//             message: 'Logged out successfully'
-//         });
-
-//     } catch (error) {
-//         console.error('Logout error:', error);
-//         return res.status(500).json({
-//             success: false,
-//             message: 'Internal server error during logout'
-//         });
-//     }
-// };
-
-// // Alternative version if using middleware for token verification
-// exports.logoutWithMiddleware = async (req, res) => {
-//     try {
-//         // If you have middleware that already verified the token and added user to req
-//         const userId = req.user?.id;
-//         const token = req.token; // Assuming middleware adds the token to req
-
-//         if (userId) {
-//             // Log user-specific logout
-//             console.log(`User ${userId} logged out at ${new Date().toISOString()}`);
-            
-//             // Optional: Update last logout time in database
-//             // await User.findByIdAndUpdate(userId, { lastLogout: new Date() });
-//         }
-
-//         // Blacklist the token
-//         if (token) {
-//             // Add to blacklist (implement according to your setup)
-//             // await blacklistToken(token);
-//         }
-
-//         // Clear cookies
-//         res.clearCookie('authToken');
-
-//         return res.status(200).json({
-//             success: true,
-//             message: 'Logged out successfully'
-//         });
-
-//     } catch (error) {
-//         console.error('Logout error:', error);
-//         return res.status(500).json({
-//             success: false,
-//             message: 'Internal server error during logout'
-//         });
-//     }
-// };
-
-// // Route setup (add this to your routes file)
-// // router.post('/api/auth/logout', logout);
-
-// // If using Express.js with middleware:
-// // router.post('/api/auth/logout', authenticateToken, logoutWithMiddleware);
-
-// // Middleware example for token verification (if needed)
-// exports.authenticateToken = (req, res, next) => {
-//     const authHeader = req.headers.authorization;
-//     const token = authHeader && authHeader.split(' ')[1];
-
-//     if (!token) {
-//         return res.status(401).json({ message: 'Access token required' });
-//     }
-
-//     // Verify JWT token
-//     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-//         if (err) {
-//             return res.status(403).json({ message: 'Invalid or expired token' });
-//         }
+        const contactMessage = new ContactMessage({
+            userId,
+            subject,
+            message
+        });
         
-//         req.user = user;
-//         req.token = token;
-//         next();
-//     });
-// };
+        await contactMessage.save();
+        res.status(201).json({ message: 'Message sent successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error sending message' });
+    }
+};
+
+// Admin gets all contact messages
+exports.getContactMessages = async (req, res) => {
+    try {
+        const messages = await ContactMessage.find()
+            .populate('userId', 'fullName email')
+            .sort({ createdAt: -1 });
+        res.json(messages);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching messages' });
+    }
+};
+
+// Admin replies to message
+exports.replyToMessage = async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const { reply } = req.body;
+        
+        await ContactMessage.findByIdAndUpdate(messageId, {
+            adminReply: reply,
+            status: 'replied',
+            repliedAt: new Date()
+        });
+        
+        res.json({ message: 'Reply sent successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error sending reply' });
+    }
+};
 
 
 
@@ -502,7 +425,7 @@ const Transaction = require("../models/Transaction");
 
 
 
-// controllers/userController.js
+
 // controllers/userController.js
 const User = require("../models/User");
 const Account = require("../models/Account");

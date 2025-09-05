@@ -8,6 +8,8 @@ const {
   fundUserAccount
 } = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
+const { replyToMessage } = require('../controllers/userController');
+const { getActiveChatSessions, getUserChatHistory, getChatStats } = require("../controllers/chatController");
 
 const router = express.Router();
 
@@ -28,5 +30,18 @@ router.post('/send-email', sendEmailToUser);
 
 // Fund user account
 router.post('/fund-user', fundUserAccount);
+
+// Add this route to your admin routes
+router.put('/reply-message/:messageId', adminAuth, replyToMessage);
+
+// In your admin routes file  
+router.get('/admin/sessions', adminAuth, getActiveChatSessions);
+
+// Get specific user's chat history (admin only)
+router.get('/admin/user/:userId', adminAuth, getUserChatHistory);
+
+// Get chat statistics (admin only)
+router.get('/admin/stats', adminAuth, getChatStats);
+
 
 module.exports = router;
