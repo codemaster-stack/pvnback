@@ -6,28 +6,40 @@ const User = require('../models/User');
 // @desc    Get recent transactions for logged-in user
 // @route   GET /api/transactions
 // @access  Private
+// controllers/transactionController.js
 exports.getUserTransactions = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Assuming each user has one main account linked by accountId
-    const user = await User.findById(userId).populate('accountId'); 
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    // Get user without populate to avoid the error
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-    const accountId = user.accountId;
+    if (!user.accountId) {
+      return res.status(404).json({ message: 'No account linked to user' });
+    }
 
-    const transactions = await Transaction.findByAccountId(accountId);
+    // Use your existing static method from Transaction schema
+    const transactions = await Transaction.findByAccountId(user.accountId);
 
-    // Return the summary for frontend
+    // Convert to summary format
     const summary = transactions.map(txn => txn.getSummary());
 
-    res.status(200).json({ transactions: summary });
+    res.status(200).json({ 
+      transactions: summary,
+      count: summary.length 
+    });
+
   } catch (error) {
     console.error('Error fetching transactions:', error);
-    res.status(500).json({ message: 'Server error fetching transactions' });
+    res.status(500).json({ 
+      message: 'Server error fetching transactions',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
-
 
 // controllers/userDashboardController.js
 exports.transfer = async (req, res) => {
