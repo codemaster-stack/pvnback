@@ -1,77 +1,6 @@
 const ChatMessage = require('../models/ChatMessage');
 const User = require('../models/User');
 
-// Get chat history for a user
-// exports.getChatHistory = async (req, res) => {
-//     try {
-//         const userId = req.user.id;
-//         const messages = await ChatMessage.find({ chatSession: userId })
-//             .populate('userId', 'fullName')
-//             .populate('adminId', 'fullName')
-//             .sort({ createdAt: 1 });
-        
-//         res.json(messages);
-//     } catch (error) {
-//         res.status(500).json({ message: 'Error fetching chat history' });
-//     }
-// };
-
-// // Admin gets all active chat sessions
-// exports.getActiveChatSessions = async (req, res) => {
-//     try {
-//         const sessions = await ChatMessage.aggregate([
-//             {
-//                 $group: {
-//                     _id: '$chatSession',
-//                     lastMessage: { $last: '$message' },
-//                     lastMessageTime: { $last: '$createdAt' },
-//                     unreadCount: {
-//                         $sum: {
-//                             $cond: [
-//                                 { $and: [{ $eq: ['$sender', 'user'] }, { $eq: ['$isRead', false] }] },
-//                                 1,
-//                                 0
-//                             ]
-//                         }
-//                     }
-//                 }
-//             },
-//             { $sort: { lastMessageTime: -1 } }
-//         ]);
-
-//         // Populate user details
-//         const populatedSessions = await User.populate(sessions, {
-//             path: '_id',
-//             select: 'fullName email'
-//         });
-
-//         res.json(populatedSessions);
-//     } catch (error) {
-//         res.status(500).json({ message: 'Error fetching chat sessions' });
-//     }
-// };
-
-// // Get messages for specific user (admin view)
-// exports.getUserChatHistory = async (req, res) => {
-//     try {
-//         const { userId } = req.params;
-//         const messages = await ChatMessage.find({ chatSession: userId })
-//             .populate('userId', 'fullName')
-//             .populate('adminId', 'fullName')
-//             .sort({ createdAt: 1 });
-
-//         // Mark admin messages as read
-//         await ChatMessage.updateMany(
-//             { chatSession: userId, sender: 'user', isRead: false },
-//             { isRead: true }
-//         );
-        
-//         res.json(messages);
-//     } catch (error) {
-//         res.status(500).json({ message: 'Error fetching user chat history' });
-//     }
-// };
-
 exports.startChatSession = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -312,7 +241,7 @@ exports.getChatHistory = async (req, res) => {
 // Admin gets all active chat sessions (ADMIN ONLY)
 exports.getActiveChatSessions = async (req, res) => {
     try {
-        if (!req.user.isAdmin) {
+        if (req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Admin access required' });
         }
         
@@ -388,7 +317,7 @@ exports.getUserChatHistory = async (req, res) => {
 // Get chat statistics (ADMIN ONLY)
 exports.getChatStats = async (req, res) => {
     try {
-        if (!req.user.isAdmin) {
+       if (req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Admin access required' });
         }
         

@@ -4,8 +4,9 @@ const adminAuth = (req, res, next) => {
     return res.status(401).json({ message: "Not authorized" });
   }
 
+  // FIX: Check role from database user object, not JWT payload
   if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Access denied, admin only" });
+    return res.status(403).json({ message: "Admin access required" });
   }
 
   next();
