@@ -2,6 +2,7 @@
 const User = require("../models/User");
 const Account = require("../models/Account"); // if needed
 const sendEmail = require("../utils/sendEmail");
+const Transaction = require("../models/Transaction");
 
 // GET all users
 exports.getAllUsers = async (req, res) => {
@@ -83,26 +84,54 @@ exports.deleteUser = async (req, res) => {
 exports.fundUserAccount = async (req, res) => {
   try {
     const { userId, amount } = req.body;
-    if (!amount || amount <= 0) return res.status(400).json({ message: "Invalid amount" });
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ message: "Invalid amount" });
+    }
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    // Optional: create or update account balance
+    // Get or create account
     let account = await Account.findOne({ userId: user._id });
     if (!account) {
       account = await Account.create({ userId: user._id, balance: 0 });
     }
+
+    // Save old balance
+    const balanceBefore = account.balance;
+
+    // Update balance
     account.balance += amount;
     await account.save();
 
-    res.status(200).json({ message: `User funded with $${amount}`, balance: account.balance });
+    // Create a transaction record
+    const transaction = new Transaction({
+      fromAccountId: account._id,       // you could also store "admin account" here if needed
+      toAccountId: account._id,
+      type: "deposit",
+      amount,
+      balanceBefore,
+      balanceAfter: account.balance,
+      description: `Admin funded user account`,
+      status: "completed",
+      channel: "admin",                 // ⚠️ make sure to add "admin" into the enum of Transaction.channel
+    });
+
+    await transaction.save();
+
+    res.status(200).json({
+      message: `User funded with $${amount}`,
+      balance: account.balance,
+      transaction: transaction.getSummary(),
+    });
+
   } catch (error) {
-    console.error(error);
+    console.error("Error funding user:", error);
     res.status(500).json({ message: "Server error funding user" });
   }
 };
-
 // Admin sends email
 exports.sendEmailToUser = async (req, res) => {
   try {
