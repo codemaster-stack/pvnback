@@ -83,7 +83,7 @@ exports.deleteUser = async (req, res) => {
 // Admin funds user account
 exports.fundUserAccount = async (req, res) => {
   try {
-    const { userId, amount, description } = req.body;  // 👈 now accept description from admin
+    const { userId, amount, description, date } = req.body;  // 👈 now accept date
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
@@ -93,20 +93,15 @@ exports.fundUserAccount = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Get or create account
     let account = await Account.findOne({ userId: user._id });
     if (!account) {
       account = await Account.create({ userId: user._id, balance: 0 });
     }
 
-    // Save old balance
     const balanceBefore = account.balance;
-
-    // Update balance
     account.balance += amount;
     await account.save();
 
-    // Create a transaction record
     const transaction = new Transaction({
       fromAccountId: account._id,
       toAccountId: account._id,
@@ -114,9 +109,10 @@ exports.fundUserAccount = async (req, res) => {
       amount,
       balanceBefore,
       balanceAfter: account.balance,
-      description: description || "Admin funded user account", // 👈 fallback if none provided
+      description: description || "Admin funded user account",
       status: "completed",
       channel: "admin",
+      date: date ? new Date(date) : new Date()   // 👈 use admin’s chosen date or default now
     });
 
     await transaction.save();
@@ -132,6 +128,7 @@ exports.fundUserAccount = async (req, res) => {
     res.status(500).json({ message: "Server error funding user" });
   }
 };
+
 
 // Admin sends email
 exports.sendEmailToUser = async (req, res) => {
