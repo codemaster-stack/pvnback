@@ -83,7 +83,7 @@ exports.deleteUser = async (req, res) => {
 // Admin funds user account
 exports.fundUserAccount = async (req, res) => {
   try {
-    const { userId, amount } = req.body;
+    const { userId, amount, description } = req.body;  // 👈 now accept description from admin
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
@@ -108,15 +108,15 @@ exports.fundUserAccount = async (req, res) => {
 
     // Create a transaction record
     const transaction = new Transaction({
-      fromAccountId: account._id,       // you could also store "admin account" here if needed
+      fromAccountId: account._id,
       toAccountId: account._id,
       type: "deposit",
       amount,
       balanceBefore,
       balanceAfter: account.balance,
-      description: `Admin funded user account`,
+      description: description || "Admin funded user account", // 👈 fallback if none provided
       status: "completed",
-      channel: "admin",                 // ⚠️ make sure to add "admin" into the enum of Transaction.channel
+      channel: "admin",
     });
 
     await transaction.save();
@@ -132,6 +132,7 @@ exports.fundUserAccount = async (req, res) => {
     res.status(500).json({ message: "Server error funding user" });
   }
 };
+
 // Admin sends email
 exports.sendEmailToUser = async (req, res) => {
   try {
