@@ -1,3 +1,58 @@
+// // routes/adminRoutes.js
+// const express = require('express');
+// const {
+//   getAllUsers,
+//   createUser,
+//   deleteUser,
+//   sendEmailToUser,
+//   fundUserAccount
+// } = require('../controllers/adminController');
+// const adminAuth = require('../middleware/adminAuth');
+// const { replyToMessage, getContactMessages } = require('../controllers/userController');
+// // const { getActiveChatSessions, getUserChatHistory, getChatStats } = require("../controllers/chatController");
+// const { getActiveChatSessions, getUserChatHistory, getChatStats, sendMessage, getChatMessages, getNewMessages } = require("../controllers/chatController");
+
+// const router = express.Router();
+
+// // Protect all routes, only admins
+// router.use(adminAuth);
+
+// // Get all users
+// router.get('/users', getAllUsers);
+
+// // Create a new user
+// router.post('/create-user', createUser);
+
+// // Delete a user
+// router.delete('/delete-user/:id', deleteUser);
+
+// // Send email to a user
+// router.post('/send-email', sendEmailToUser);
+
+// // Fund user account
+// router.post('/fund-user', fundUserAccount);
+
+// // Add this route to your admin routes
+// router.put('/reply-message/:messageId', adminAuth, replyToMessage);
+
+// // In your admin routes file  
+// router.get('/admin/sessions', adminAuth, getActiveChatSessions);
+
+// // Get specific user's chat history (admin only)
+// router.get('/admin/user/:userId', adminAuth, getUserChatHistory);
+
+// // Get chat statistics (admin only)
+// router.get('/admin/stats', adminAuth, getChatStats);
+
+// router. get('/contact-messages', adminAuth, getContactMessages);
+
+// // Add these admin message routes
+// router.post('/message', sendMessage);
+// router.get('/messages/:sessionId', getChatMessages);
+// router.get('/messages/:sessionId/new', getNewMessages);
+
+
+// module.exports = router;
 // routes/adminRoutes.js
 const express = require('express');
 const {
@@ -9,7 +64,8 @@ const {
 } = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
 const { replyToMessage, getContactMessages } = require('../controllers/userController');
-const { getActiveChatSessions, getUserChatHistory, getChatStats } = require("../controllers/chatController");
+// FIX 1: Add sendMessage, getChatMessages, getNewMessages to imports
+const { getActiveChatSessions, getUserChatHistory, getChatStats, sendMessage, getChatMessages, getNewMessages } = require("../controllers/chatController");
 
 const router = express.Router();
 
@@ -34,16 +90,16 @@ router.post('/fund-user', fundUserAccount);
 // Add this route to your admin routes
 router.put('/reply-message/:messageId', adminAuth, replyToMessage);
 
-// In your admin routes file  
-router.get('/admin/sessions', adminAuth, getActiveChatSessions);
+// FIX 2: Clean up chat routes - remove duplicate adminAuth and /admin prefixes
+router.get('/sessions', getActiveChatSessions);
+router.get('/user/:userId', getUserChatHistory);
+router.get('/stats', getChatStats);
 
-// Get specific user's chat history (admin only)
-router.get('/admin/user/:userId', adminAuth, getUserChatHistory);
+// FIX 3: Add missing message routes for admin
+router.post('/message', sendMessage);
+router.get('/messages/:sessionId', getChatMessages);
+router.get('/messages/:sessionId/new', getNewMessages);
 
-// Get chat statistics (admin only)
-router.get('/admin/stats', adminAuth, getChatStats);
-
-router. get('/contact-messages', adminAuth, getContactMessages);
-
+router.get('/contact-messages', getContactMessages);
 
 module.exports = router;
