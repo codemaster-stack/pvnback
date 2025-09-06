@@ -93,39 +93,129 @@ exports.sendMessage = async (req, res) => {
 
 
 // Fixed getChatMessages function
+// exports.getChatMessages = async (req, res) => {
+//     try {
+//         const { sessionId } = req.params;
+//         const userId = req.user.id;
+        
+//         // FIX 1: Change isAdmin check to role check
+//         if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
+//             return res.status(403).json({ message: 'Access denied' });
+//         }
+        
+//         const messages = await ChatMessage.find({ 
+//             chatSession: sessionId,
+//             sender: { $ne: 'system' } // Exclude system messages
+//         })
+//         .populate('userId', 'fullName email')
+//         .populate('adminId', 'fullName email')
+//         .sort({ createdAt: 1 });
+        
+//         // Mark messages as read if user is viewing
+//         if (req.user.role !== 'admin') {
+//             await ChatMessage.updateMany(
+//                 { chatSession: sessionId, sender: 'admin', isRead: false },
+//                 { isRead: true }
+//             );
+//         } else {
+//             // Admin viewing - mark user messages as read
+//             await ChatMessage.updateMany(
+//                 { chatSession: sessionId, sender: 'user', isRead: false },
+//                 { isRead: true }
+//             );
+//         }
+        
+//         res.json({ messages });
+        
+//     } catch (error) {
+//         console.error('Get chat messages error:', error);
+//         res.status(500).json({ message: 'Error fetching chat messages' });
+//     }
+// };
+
+// // Fixed getNewMessages function
+// exports.getNewMessages = async (req, res) => {
+//     try {
+//         const { sessionId } = req.params;
+//         const { after } = req.query; // Message ID to get messages after
+//         const userId = req.user.id;
+        
+//         // FIX 1: Change isAdmin check to role check
+//         if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
+//             return res.status(403).json({ message: 'Access denied' });
+//         }
+        
+//         let query = { 
+//             chatSession: sessionId,
+//             sender: { $ne: 'system' }
+//         };
+        
+//         // If polling for messages after a specific message
+//         if (after) {
+//             query._id = { $gt: after };
+//         }
+        
+//         // FIX 2: Remove time restriction that was blocking messages
+//         if (req.user.role !== 'admin') {
+//             // For users, get only admin messages they haven't seen
+//             query.sender = 'admin';
+//         } else {
+//             // For admins, get user messages  
+//             query.sender = 'user';
+//         }
+        
+//         const messages = await ChatMessage.find(query)
+//             .populate('userId', 'fullName email')
+//             .populate('adminId', 'fullName email')
+//             .sort({ createdAt: 1 })
+//             .limit(50); // Limit to prevent large responses
+        
+//         res.json({ messages });
+        
+//     } catch (error) {
+//         console.error('Get new messages error:', error);
+//         res.status(500).json({ message: 'Error fetching new messages' });
+//     }
+// };
+
+
+
+// Fixed controller with proper polling mechanism
 exports.getChatMessages = async (req, res) => {
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
         
-        // FIX 1: Change isAdmin check to role check
         if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
             return res.status(403).json({ message: 'Access denied' });
         }
         
-        const messages = await ChatMessage.find({ 
+        const messages = await ChatMessage.find({
             chatSession: sessionId,
-            sender: { $ne: 'system' } // Exclude system messages
+            sender: { $ne: 'system' }
         })
         .populate('userId', 'fullName email')
         .populate('adminId', 'fullName email')
         .sort({ createdAt: 1 });
         
-        // Mark messages as read if user is viewing
+        // Mark messages as read
         if (req.user.role !== 'admin') {
             await ChatMessage.updateMany(
                 { chatSession: sessionId, sender: 'admin', isRead: false },
                 { isRead: true }
             );
         } else {
-            // Admin viewing - mark user messages as read
             await ChatMessage.updateMany(
                 { chatSession: sessionId, sender: 'user', isRead: false },
                 { isRead: true }
             );
         }
         
-        res.json({ messages });
+        res.json({ 
+            messages,
+            lastMessageId: messages.length > 0 ? messages[messages.length - 1]._id : null,
+            timestamp: new Date().toISOString()
+        });
         
     } catch (error) {
         console.error('Get chat messages error:', error);
@@ -133,34 +223,33 @@ exports.getChatMessages = async (req, res) => {
     }
 };
 
-// Fixed getNewMessages function
+// Improved getNewMessages with better polling logic
 exports.getNewMessages = async (req, res) => {
     try {
         const { sessionId } = req.params;
-        const { after } = req.query; // Message ID to get messages after
+        const { after, timestamp } = req.query;
         const userId = req.user.id;
         
-        // FIX 1: Change isAdmin check to role check
         if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
             return res.status(403).json({ message: 'Access denied' });
         }
         
-        let query = { 
+        let query = {
             chatSession: sessionId,
             sender: { $ne: 'system' }
         };
         
-        // If polling for messages after a specific message
+        // Use both message ID and timestamp for better filtering
         if (after) {
             query._id = { $gt: after };
+        } else if (timestamp) {
+            query.createdAt = { $gt: new Date(timestamp) };
         }
         
-        // FIX 2: Remove time restriction that was blocking messages
+        // Filter by sender based on user role
         if (req.user.role !== 'admin') {
-            // For users, get only admin messages they haven't seen
             query.sender = 'admin';
         } else {
-            // For admins, get user messages  
             query.sender = 'user';
         }
         
@@ -168,15 +257,70 @@ exports.getNewMessages = async (req, res) => {
             .populate('userId', 'fullName email')
             .populate('adminId', 'fullName email')
             .sort({ createdAt: 1 })
-            .limit(50); // Limit to prevent large responses
+            .limit(50);
         
-        res.json({ messages });
+        // Only return data if there are new messages
+        if (messages.length === 0) {
+            return res.status(204).send(); // No content
+        }
+        
+        res.json({ 
+            messages,
+            lastMessageId: messages[messages.length - 1]._id,
+            timestamp: new Date().toISOString(),
+            hasNewMessages: messages.length > 0
+        });
         
     } catch (error) {
         console.error('Get new messages error:', error);
         res.status(500).json({ message: 'Error fetching new messages' });
     }
 };
+
+// Add a separate endpoint for checking if there are new messages (lighter weight)
+exports.checkForNewMessages = async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const { after, timestamp } = req.query;
+        const userId = req.user.id;
+        
+        if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+        
+        let query = {
+            chatSession: sessionId,
+            sender: { $ne: 'system' }
+        };
+        
+        if (after) {
+            query._id = { $gt: after };
+        } else if (timestamp) {
+            query.createdAt = { $gt: new Date(timestamp) };
+        }
+        
+        if (req.user.role !== 'admin') {
+            query.sender = 'admin';
+        } else {
+            query.sender = 'user';
+        }
+        
+        const count = await ChatMessage.countDocuments(query);
+        
+        res.json({ 
+            hasNewMessages: count > 0,
+            count: count,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('Check new messages error:', error);
+        res.status(500).json({ message: 'Error checking for new messages' });
+    }
+};
+
+
+
 
 // End chat session (USER & ADMIN)
 exports.endChatSession = async (req, res) => {
@@ -185,7 +329,7 @@ exports.endChatSession = async (req, res) => {
         const userId = req.user.id;
         
         // Access control
-        if (!req.user.isAdmin && sessionId !== userId.toString()) {
+        if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
             return res.status(403).json({ message: 'Access denied' });
         }
         

@@ -2,7 +2,7 @@
 const express = require("express");
 const { getUserAccounts, deposit, withdraw, getAccountDetails, getUserProfile, submitContactMessage } = require("../controllers/userController");
 const { protect } = require("../middleware/auth"); // make sure you have this
-const { startChatSession, sendMessage, getChatMessages, getNewMessages, endChatSession, getChatHistory } = require("../controllers/chatController");
+const { startChatSession, sendMessage, getChatMessages, getNewMessages, endChatSession, getChatHistory, checkForNewMessages } = require("../controllers/chatController");
 
 
 const router = express.Router();
@@ -35,6 +35,8 @@ router.get('/messages/:sessionId', protect, getChatMessages);
 
 // Get new messages since last check (for polling)
 router.get('/messages/:sessionId/new', protect, getNewMessages);
+// Add this missing route for checking new messages
+router.get('/messages/:sessionId/check', protect, checkForNewMessages);
 
 // End chat session
 router.post('/end/:sessionId', protect, endChatSession);
