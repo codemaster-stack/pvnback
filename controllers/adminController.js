@@ -112,7 +112,7 @@ exports.fundUserAccount = async (req, res) => {
       description: description || "Admin funded user account",
       status: "completed",
       channel: "admin",
-      date: date ? new Date(date) : new Date()   // 👈 use admin’s chosen date or default now
+      transactionDate: date ? new Date(date) : new Date()   // 👈 use admin’s chosen date or default now
     });
 
     await transaction.save();
