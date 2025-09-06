@@ -6,11 +6,35 @@ const sendEmail = require("../utils/sendEmail");
 // GET all users
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: { $ne: "admin" } }).select("-password");
-    res.status(200).json(users);
+    // 1. Get all non-admin users
+    const users = await User.find({ role: { $ne: "admin" } })
+      .select("-password")
+      .lean(); // lean() makes it plain JS objects
+
+    // 2. Get accounts for those users
+    const accounts = await Account.find({
+      userId: { $in: users.map((u) => u._id) },
+    }).lean();
+
+    // 3. Merge account info into each user
+    const usersWithAccounts = users.map((user) => {
+      const account = accounts.find(
+        (a) => a.userId.toString() === user._id.toString()
+      );
+
+      return {
+        ...user,
+        accountNumber: account ? account.accountNumber : null,
+        balance: account ? account.balance : 0,
+      };
+    });
+
+    res.status(200).json(usersWithAccounts);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error fetching users" });
+    res
+      .status(500)
+      .json({ message: "Server error fetching users", error: error.message });
   }
 };
 
