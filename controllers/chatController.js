@@ -91,15 +91,15 @@ exports.sendMessage = async (req, res) => {
     }
 };
 
-// Get chat messages for a session (USER & ADMIN)
+
+// Fixed getChatMessages function
 exports.getChatMessages = async (req, res) => {
     try {
         const { sessionId } = req.params;
         const userId = req.user.id;
         
-        // For users, they can only access their own chat
-        // For admins, they can access any chat session
-        if (!req.user.isAdmin && sessionId !== userId.toString()) {
+        // FIX 1: Change isAdmin check to role check
+        if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
             return res.status(403).json({ message: 'Access denied' });
         }
         
@@ -112,7 +112,7 @@ exports.getChatMessages = async (req, res) => {
         .sort({ createdAt: 1 });
         
         // Mark messages as read if user is viewing
-        if (!req.user.isAdmin) {
+        if (req.user.role !== 'admin') {
             await ChatMessage.updateMany(
                 { chatSession: sessionId, sender: 'admin', isRead: false },
                 { isRead: true }
@@ -133,15 +133,15 @@ exports.getChatMessages = async (req, res) => {
     }
 };
 
-// Get new messages since last check (POLLING)
+// Fixed getNewMessages function
 exports.getNewMessages = async (req, res) => {
     try {
         const { sessionId } = req.params;
         const { after } = req.query; // Message ID to get messages after
         const userId = req.user.id;
         
-        // Access control
-        if (!req.user.isAdmin && sessionId !== userId.toString()) {
+        // FIX 1: Change isAdmin check to role check
+        if (req.user.role !== 'admin' && sessionId !== userId.toString()) {
             return res.status(403).json({ message: 'Access denied' });
         }
         
@@ -155,17 +155,13 @@ exports.getNewMessages = async (req, res) => {
             query._id = { $gt: after };
         }
         
-        // For users, get only admin messages they haven't seen
-        if (!req.user.isAdmin) {
+        // FIX 2: Remove time restriction that was blocking messages
+        if (req.user.role !== 'admin') {
+            // For users, get only admin messages they haven't seen
             query.sender = 'admin';
-            // Get messages from the last 30 seconds to catch new ones
-            const thirtySecondsAgo = new Date(Date.now() - 30000);
-            query.createdAt = { $gte: thirtySecondsAgo };
         } else {
-            // For admins, get user messages
+            // For admins, get user messages  
             query.sender = 'user';
-            const thirtySecondsAgo = new Date(Date.now() - 30000);
-            query.createdAt = { $gte: thirtySecondsAgo };
         }
         
         const messages = await ChatMessage.find(query)
@@ -288,7 +284,8 @@ exports.getActiveChatSessions = async (req, res) => {
 // Get messages for specific user (ADMIN VIEW)
 exports.getUserChatHistory = async (req, res) => {
     try {
-        if (!req.user.isAdmin) {
+
+            if (req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Admin access required' });
         }
         
