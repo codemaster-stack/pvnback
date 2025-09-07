@@ -2,7 +2,6 @@
 const express = require('express');
 const {
   getAllUsers,
-  createUser,
   deleteUser,
   sendEmailToUser,
   fundUserAccount
@@ -21,9 +20,6 @@ router.use(adminAuth); // This checks if req.user.role === 'admin'
 
 // Get all users
 router.get('/users', getAllUsers);
-
-// Create a new user
-router.post('/create-user', createUser);
 
 // Delete a user
 router.delete('/delete-user/:id', deleteUser);

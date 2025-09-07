@@ -36,26 +36,28 @@ exports.getUserTransactions = async (req, res) => {
 
 
 // controllers/userDashboardController.js
+// controllers/transactionController.js
+// controllers/transactionController.js
 exports.transfer = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { fromAccountId } = req.params;
+    const userId = req.body.fromUserId; // send from frontend
     const { toAccountNumber, amount, description } = req.body;
 
     if (!toAccountNumber || !amount || amount <= 0) {
       return res.status(400).json({ message: "Destination account and valid amount required." });
     }
 
-    const fromAccount = await Account.findOne({ _id: fromAccountId, userId });
+    // Get the user's primary account
+    const fromAccount = await Account.findOne({ userId });
     if (!fromAccount) return res.status(404).json({ message: "Source account not found." });
 
-    const check = fromAccount.canPerformTransaction(amount, "debit");
-    if (!check.allowed) return res.status(400).json({ message: check.reason });
-
-    const toAccount = await Account.findByAccountNumber(toAccountNumber);
+    const toAccount = await Account.findOne({ accountNumber: toAccountNumber });
     if (!toAccount) return res.status(404).json({ message: "Destination account not found." });
 
-    // Update balances
+    if (fromAccount.balance < amount) {
+      return res.status(400).json({ message: "Insufficient funds." });
+    }
+
     const fromBalanceBefore = fromAccount.balance;
     const toBalanceBefore = toAccount.balance;
 
@@ -65,7 +67,6 @@ exports.transfer = async (req, res) => {
     await fromAccount.save();
     await toAccount.save();
 
-    // Create transactions for both accounts
     const fromTransaction = await Transaction.create({
       fromAccountId: fromAccount._id,
       toAccountId: toAccount._id,
@@ -74,7 +75,7 @@ exports.transfer = async (req, res) => {
       amount,
       balanceBefore: fromBalanceBefore,
       balanceAfter: fromAccount.balance,
-      description: description || `Transfer to ${toAccount.maskedAccountNumber}`,
+      description: description || `Transfer to ${toAccount.accountNumber}`,
       channel: "online",
       status: "completed",
       transactionDate: new Date(),
@@ -88,7 +89,7 @@ exports.transfer = async (req, res) => {
       amount,
       balanceBefore: toBalanceBefore,
       balanceAfter: toAccount.balance,
-      description: description || `Transfer from ${fromAccount.maskedAccountNumber}`,
+      description: description || `Transfer from ${fromAccount.accountNumber}`,
       channel: "online",
       status: "completed",
       transactionDate: new Date(),
@@ -97,11 +98,10 @@ exports.transfer = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Transfer successful",
-      fromAccount: fromAccount.toDisplayFormat(),
-      toAccount: toAccount.toDisplayFormat(),
-      transaction: fromTransaction.getSummary(),
+      fromAccount: fromAccount,
+      toAccount: toAccount,
+      transaction: fromTransaction,
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error processing transfer." });

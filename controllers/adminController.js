@@ -38,33 +38,6 @@ exports.getAllUsers = async (req, res) => {
       .json({ message: "Server error fetching users", error: error.message });
   }
 };
-
-// Admin creates a new user
-exports.createUser = async (req, res) => {
-  try {
-    const { fullName, email, phone, password } = req.body;
-    if (!fullName || !email || !phone || !password) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: "User already exists" });
-
-    const user = await User.create({ fullName, email, phone, password, role: "user" });
-
-    res.status(201).json({
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error creating user" });
-  }
-};
-
 // Admin deletes a user
 exports.deleteUser = async (req, res) => {
   try {
