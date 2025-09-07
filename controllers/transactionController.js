@@ -92,7 +92,7 @@ exports.transfer = async (req, res) => {
       description: description || `Transfer from ${fromAccount.accountNumber}`,
       channel: "online",
       status: "completed",
-      transactionDate: new Date(),
+      transactionDate: date ? new Date(date) : new Date(),
     });
 
     res.status(200).json({
