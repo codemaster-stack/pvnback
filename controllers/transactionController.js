@@ -41,7 +41,7 @@ exports.getUserTransactions = async (req, res) => {
 exports.transfer = async (req, res) => {
   try {
     const userId = req.body.fromUserId; // send from frontend
-    const { toAccountNumber, amount, description } = req.body;
+    const { toAccountNumber, amount, description, date } = req.body;
 
     if (!toAccountNumber || !amount || amount <= 0) {
       return res.status(400).json({ message: "Destination account and valid amount required." });
@@ -67,26 +67,26 @@ exports.transfer = async (req, res) => {
     await fromAccount.save();
     await toAccount.save();
 
-    const fromTransaction = await Transaction.create({
-      fromAccountId: fromAccount._id,
-      toAccountId: toAccount._id,
-      type: "transfer",
-      category: "banking",
-      amount,
-      balanceBefore: fromBalanceBefore,
-      balanceAfter: fromAccount.balance,
-      description: description || `Transfer to ${toAccount.accountNumber}`,
-      channel: "online",
-      status: "completed",
-      transactionDate: new Date(),
-    });
+  const fromTransaction = await Transaction.create({
+  fromAccountId: fromAccount._id,
+  toAccountId: toAccount._id,
+  type: "transfer",
+  category: "banking",
+  amount,
+  balanceBefore: fromBalanceBefore,
+  balanceAfter: fromAccount.balance,
+  description: description || `Transfer to ${toAccount.accountNumber}`,
+  channel: "online",
+  status: "completed",
+  transactionDate: date ? new Date(date) : new Date(), // Use custom date here too
+});
 
     const toTransaction = await Transaction.create({
       fromAccountId: fromAccount._id,
       toAccountId: toAccount._id,
       type: "deposit",
       category: "banking",
-      amount,
+      amount: -amount,
       balanceBefore: toBalanceBefore,
       balanceAfter: toAccount.balance,
       description: description || `Transfer from ${fromAccount.accountNumber}`,
@@ -102,6 +102,10 @@ exports.transfer = async (req, res) => {
       toAccount: toAccount,
       transaction: fromTransaction,
     });
+    console.log("Transfer body:", req.body);
+    console.log("From account:", fromAccount);
+    console.log("To account:", toAccount);
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error processing transfer." });
