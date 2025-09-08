@@ -67,8 +67,13 @@ const transactionSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: true,
-    min: [0.01, "Transaction amount must be at least $0.01"]
-  },
+    validate: {
+        validator: function(value) {
+            return Math.abs(value) >= 0.01;
+        },
+        message: "Transaction amount must be at least $0.01 (absolute value)"
+    }
+},
   fee: {
     type: Number,
     default: 0,
