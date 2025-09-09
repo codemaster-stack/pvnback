@@ -1,8 +1,9 @@
 // controllers/userDashboardController.js
-// const User = require("../models/User");
-// const Account = require("../models/Account");
+const User = require("../models/User");
+const Account = require("../models/Account");
 const Transaction = require("../models/Transaction");
 const ContactMessage = require('../models/Contact');
+const PDFDocument = require("pdfkit");
 
 
 
@@ -10,7 +11,7 @@ const ContactMessage = require('../models/Contact');
 exports.submitContactMessage = async (req, res) => {
   try {
     const { subject, message, email, phone } = req.body;
-    const userId = req.user.id;
+    const userId = req.user._id;
 
     const contactMessage = new ContactMessage({
       userId,
@@ -34,81 +35,96 @@ exports.submitContactMessage = async (req, res) => {
 
 exports.downloadStatement = async (req, res) => {
   try {
-    const userId = req.user.id;
-
-    // Find user's account
-    const account = await Account.findOne({ userId });
-    if (!account) {
-      return res.status(404).json({ message: 'No account found for user' });
+    // ✅ Make sure req.user exists
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized: No user found" });
     }
 
-    // Fetch latest 100 transactions
-    const transactions = await Transaction.findByAccountId(account._id, 100);
+    const userId = req.user.id;
 
-    // Create PDF
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    // ✅ Get user's account
+    const account = await Account.findOne({ userId });
+    if (!account) {
+      return res.status(404).json({ message: "No account found for user" });
+    }
+
+    // ✅ Fetch latest 100 transactions safely
+    const transactions = await Transaction.find({ accountId: account._id })
+      .sort({ transactionDate: -1 })
+      .limit(100);
+
+    // ✅ Set headers
     const filename = `statement_${Date.now()}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
 
-    // Set headers for download
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    // ✅ Start PDF stream
+    const doc = new PDFDocument({ margin: 40, size: "A4" });
     doc.pipe(res);
 
     // Title
-    doc.fontSize(20).text('Supapay Transaction Statement', { align: 'center' });
+    doc.fontSize(20).text("Supapay Transaction Statement", { align: "center" });
     doc.moveDown();
-    doc.fontSize(12).text(`Account Number: ${account.accountNumber || 'N/A'}`);
+    doc.fontSize(12).text(`Account Number: ${account.accountNumber || "N/A"}`);
     doc.text(`Generated On: ${new Date().toLocaleString()}`);
     doc.moveDown();
 
-    // If no transactions
-    if (transactions.length === 0) {
-      doc.fontSize(14).text('No transactions available for this period.', { align: 'center' });
+    // ✅ If no transactions, add placeholder
+    if (!transactions || transactions.length === 0) {
+      doc.fontSize(14).text("No transactions available for this period.", {
+        align: "center",
+      });
       doc.end();
       return;
     }
 
     // Table Header
-    doc.fontSize(13).text('Date', 50, doc.y, { continued: true });
-    doc.text('Description', 150, doc.y, { continued: true });
-    doc.text('Amount', 350, doc.y, { continued: true });
-    doc.text('Balance After', 450);
+    doc.fontSize(13).fillColor("black");
+    doc.text("Date", 50, doc.y, { continued: true });
+    doc.text("Description", 150, doc.y, { continued: true });
+    doc.text("Amount", 350, doc.y, { continued: true });
+    doc.text("Balance After", 450);
     doc.moveDown();
     doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
     doc.moveDown(0.5);
 
     // Transactions Table
-    transactions.forEach(tx => {
-      const date = new Date(tx.transactionDate).toLocaleDateString();
-      const amountFormatted = `₦${Math.abs(tx.amount).toLocaleString()}`;
-      const amountColor = tx.amount < 0 ? 'red' : 'green';
+    transactions.forEach((tx) => {
+      const date = tx.transactionDate
+        ? new Date(tx.transactionDate).toLocaleDateString()
+        : new Date(tx.createdAt).toLocaleDateString();
 
-      doc.fontSize(11).fillColor('black').text(date, 50, doc.y, { continued: true });
-      doc.text(tx.description || '-', 150, doc.y, { continued: true });
+      const amountFormatted = `₦${Math.abs(tx.amount).toLocaleString()}`;
+      const amountColor = tx.amount < 0 ? "red" : "green";
+
+      doc.fontSize(11).fillColor("black").text(date, 50, doc.y, { continued: true });
+      doc.text(tx.description || "-", 150, doc.y, { continued: true });
       doc.fillColor(amountColor).text(
-        `${tx.amount < 0 ? '-' : '+'}${amountFormatted}`,
+        `${tx.amount < 0 ? "-" : "+"}${amountFormatted}`,
         350,
         doc.y,
         { continued: true }
       );
-      doc.fillColor('black').text(`₦${tx.balanceAfter.toLocaleString()}`, 450);
+      doc.fillColor("black").text(`₦${tx.balanceAfter.toLocaleString()}`, 450);
       doc.moveDown();
     });
 
     // Footer
     doc.moveDown();
-    doc.fontSize(10).fillColor('gray').text(
-      'This is a system-generated statement. If you have questions, contact Supapay Support.',
-      { align: 'center' }
+    doc.fontSize(10).fillColor("gray").text(
+      "This is a system-generated statement. If you have questions, contact Supapay Support.",
+      { align: "center" }
     );
 
+    // ✅ End PDF stream
     doc.end();
   } catch (error) {
-    console.error('Error generating statement:', error);
-    res.status(500).json({ message: 'Error generating statement' });
+    console.error("❌ Error generating statement:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Error generating statement" });
+    }
   }
 };
-
 
 // Admin gets all contact messages
 exports.getContactMessages = async (req, res) => {
@@ -172,11 +188,6 @@ exports.getConversation = async (req, res) => {
 
 
 
-
-
-// controllers/userController.js
-const User = require("../models/User");
-const Account = require("../models/Account");
 
 // 🔹 ROBUST: Get user profile with fallback for existing users
 exports.getUserProfile = async (req, res) => {

@@ -1,14 +1,15 @@
-// routes/contact.js
 const express = require('express');
 const sendEmail = require('../utils/sendEmail');
+const ContactMessage = require('../models/Contact');
 const router = express.Router();
 
 // Handle contact form submission
 router.post('/contact', async (req, res) => {
     try {
-        const { subject, message } = req.body;
-        
-        // Validate input
+        const userId = req.user ? req.user.id : null; // Handle logged-in & guest users
+        const { email, phone, subject, message } = req.body;
+
+        // Validate required fields
         if (!subject || !message) {
             return res.status(400).json({
                 status: 'error',
@@ -16,9 +17,20 @@ router.post('/contact', async (req, res) => {
             });
         }
 
-        // Email options
+        // Save message to DB
+        const newMessage = new ContactMessage({
+            userId: userId || undefined, // Save if logged in, otherwise skip
+            email: email || 'N/A',
+            phone: phone || 'N/A',
+            subject,
+            message
+        });
+
+        await newMessage.save();
+
+        // Prepare email for admin
         const emailOptions = {
-            email: 'johnlegendry2@gmail.com', // Your admin email
+            email: 'johnlegendry2@gmail.com', // Admin email
             subject: `Contact Form: ${subject}`,
             message: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -27,8 +39,10 @@ router.post('/contact', async (req, res) => {
                     </h2>
                     
                     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                        <p style="margin: 0 0 10px 0;"><strong>Subject:</strong> ${subject}</p>
-                        <p style="margin: 0;"><strong>Message:</strong></p>
+                        <p><strong>From:</strong> ${email || 'Not provided'}</p>
+                        <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
+                        <p><strong>Subject:</strong> ${subject}</p>
+                        <p><strong>Message:</strong></p>
                         <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 10px;">
                             ${message.replace(/\n/g, '<br>')}
                         </div>
@@ -36,26 +50,26 @@ router.post('/contact', async (req, res) => {
                     
                     <hr style="border: none; height: 1px; background: #eee; margin: 20px 0;">
                     <p style="color: #666; font-size: 12px; text-align: center;">
-                        This message was sent from the PVNB website contact form<br>
+                        Sent from PVNB Contact Form <br>
                         Time: ${new Date().toLocaleString()}
                     </p>
                 </div>
             `
         };
 
-        // Send email using your existing function
+        // Send email notification
         await sendEmail(emailOptions);
-        
-        res.json({
+
+        return res.status(200).json({
             status: 'success',
-            message: 'Your message has been sent successfully! We will get back to you soon.'
+            message: 'Your message has been sent successfully and saved in our system!'
         });
-        
+
     } catch (error) {
         console.error('Contact form error:', error);
-        res.status(500).json({
+        return res.status(500).json({
             status: 'error',
-            message: 'Failed to send message. Please try again later.'
+            message: 'Failed to send your message. Please try again later.'
         });
     }
 });
