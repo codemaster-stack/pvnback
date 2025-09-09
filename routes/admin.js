@@ -43,6 +43,7 @@ router.post('/message', sendMessage);
 router.get('/messages/:sessionId', getChatMessages);
 router.get('/messages/:sessionId/new', getNewMessages);
 
-router.get('/contact-messages', getContactMessages);
+// router.get('/contact-messages', getContactMessages);
+
 
 module.exports = router;

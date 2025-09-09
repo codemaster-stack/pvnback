@@ -4,10 +4,10 @@ const ContactMessage = require('../models/Contact');
 const router = express.Router();
 
 // Handle contact form submission
-router.post('/contact', async (req, res) => {
+router.post('/contactbymail', async (req, res) => {
     try {
         const userId = req.user ? req.user.id : null; // Handle logged-in & guest users
-        const { email, phone, subject, message } = req.body;
+        const {  subject, message } = req.body;
 
         // Validate required fields
         if (!subject || !message) {
@@ -19,9 +19,7 @@ router.post('/contact', async (req, res) => {
 
         // Save message to DB
         const newMessage = new ContactMessage({
-            userId: userId || undefined, // Save if logged in, otherwise skip
-            email: email || 'N/A',
-            phone: phone || 'N/A',
+            userId: userId || undefined, // 
             subject,
             message
         });

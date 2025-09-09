@@ -35,12 +35,18 @@ exports.submitContactMessage = async (req, res) => {
 
 exports.downloadStatement = async (req, res) => {
   try {
-    // ✅ Make sure req.user exists
+    // ✅ Check if user is authenticated
     if (!req.user || !req.user.id) {
       return res.status(401).json({ message: "Unauthorized: No user found" });
     }
 
     const userId = req.user.id;
+
+    // ✅ Get user details
+    const user = await User.findById(userId).select("fullName email");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     // ✅ Get user's account
     const account = await Account.findOne({ userId });
@@ -48,37 +54,42 @@ exports.downloadStatement = async (req, res) => {
       return res.status(404).json({ message: "No account found for user" });
     }
 
-    // ✅ Fetch latest 100 transactions safely
-    const transactions = await Transaction.find({ accountId: account._id })
+    // ✅ Fetch the latest 100 transactions for this account
+    const transactions = await Transaction.find({
+      $or: [
+        { fromAccountId: account._id },
+        { toAccountId: account._id }
+      ]
+    })
       .sort({ transactionDate: -1 })
       .limit(100);
 
-    // ✅ Set headers
-    const filename = `statement_${Date.now()}.pdf`;
+    // ✅ Set up PDF headers
+    const filename = `${user.fullName.replace(/\s+/g, "_")}_statement_${Date.now()}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
 
-    // ✅ Start PDF stream
+    // ✅ Start generating PDF
     const doc = new PDFDocument({ margin: 40, size: "A4" });
     doc.pipe(res);
 
-    // Title
-    doc.fontSize(20).text("Supapay Transaction Statement", { align: "center" });
+    // ✅ Title
+    doc.fontSize(20).text(`${user.fullName}'s Transaction Statement`, { align: "center" });
     doc.moveDown();
-    doc.fontSize(12).text(`Account Number: ${account.accountNumber || "N/A"}`);
+    doc.fontSize(12).text(`Account Holder: ${user.fullName}`);
+    doc.text(`Account Number: ${account.accountNumber || "N/A"}`);
+    doc.text(`Email: ${user.email || "N/A"}`);
     doc.text(`Generated On: ${new Date().toLocaleString()}`);
     doc.moveDown();
 
-    // ✅ If no transactions, add placeholder
+    // ✅ If no transactions
     if (!transactions || transactions.length === 0) {
-      doc.fontSize(14).text("No transactions available for this period.", {
-        align: "center",
-      });
+      doc.fontSize(14).text("No transactions available for this period.", { align: "center" });
       doc.end();
       return;
     }
 
-    // Table Header
+    // ✅ Table Header
     doc.fontSize(13).fillColor("black");
     doc.text("Date", 50, doc.y, { continued: true });
     doc.text("Description", 150, doc.y, { continued: true });
@@ -88,7 +99,7 @@ exports.downloadStatement = async (req, res) => {
     doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
     doc.moveDown(0.5);
 
-    // Transactions Table
+    // ✅ Transaction Rows
     transactions.forEach((tx) => {
       const date = tx.transactionDate
         ? new Date(tx.transactionDate).toLocaleDateString()
@@ -109,10 +120,10 @@ exports.downloadStatement = async (req, res) => {
       doc.moveDown();
     });
 
-    // Footer
+    // ✅ Footer
     doc.moveDown();
     doc.fontSize(10).fillColor("gray").text(
-      "This is a system-generated statement. If you have questions, contact Supapay Support.",
+      "This is a system-generated statement. If you have questions, contact PVN Bank Support.",
       { align: "center" }
     );
 
@@ -123,19 +134,6 @@ exports.downloadStatement = async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ message: "Error generating statement" });
     }
-  }
-};
-
-// Admin gets all contact messages
-exports.getContactMessages = async (req, res) => {
-  try {
-    const messages = await ContactMessage.find()
-      .populate('userId', 'fullName email')
-      .sort({ updatedAt: -1 });
-
-    res.json(messages);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching messages' });
   }
 };
 

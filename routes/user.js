@@ -1,6 +1,6 @@
 // routes/userDashboard.js
 const express = require("express");
-const { getUserAccounts, deposit, withdraw, getAccountDetails, getUserProfile, submitContactMessage, getContactMessages, replyToMessage, getConversation } = require("../controllers/userController");
+const { getUserAccounts, deposit, withdraw, getAccountDetails, getUserProfile, submitContactMessage, replyToMessage, getConversation } = require("../controllers/userController");
 const { protect } = require("../middleware/auth"); // make sure you have this
 const { startChatSession, sendMessage, getChatMessages, getNewMessages, endChatSession, getChatHistory, checkForNewMessages } = require("../controllers/chatController");
 
@@ -26,8 +26,8 @@ router.get('/profile', protect, getUserProfile);
 // router.post('/contact/reply/:messageId', protect, replyToMessage);
 
 
-router.post('/contact', protect, submitContactMessage);          // user starts message
-router.get('/contact/messages', protect, getContactMessages);    // admin fetch all
+router.post('/contactbyform', protect, submitContactMessage);          // user starts message
+// router.get('/contact/messages', protect, getContactMessages);    // admin fetch all
 router.post('/contact/reply/:messageId', protect, replyToMessage); // both can reply
 router.get('/contact/:messageId', protect, getConversation);     // get single thread
 
