@@ -7,53 +7,104 @@ const ContactMessage = require('../models/Contact');
 
 
 // User submits contact form
+// userController.js
 exports.submitContactMessage = async (req, res) => {
-    try {
-        const { subject, message } = req.body;
-        const userId = req.user.id;
-        
-        const contactMessage = new ContactMessage({
-            userId,
-            subject,
-            message
-        });
-        
-        await contactMessage.save();
-        res.status(201).json({ message: 'Message sent successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error sending message' });
-    }
+  try {
+    const { subject, message } = req.body;
+    const userId = req.user.id;
+
+    const contactMessage = new ContactMessage({
+      userId,
+      subject,
+      messages: [{ senderRole: 'user', text: message }]
+    });
+
+    await contactMessage.save();
+
+    // 🔔 Create notification for admin
+    // await Notification.create({ type: 'contact', refId: contactMessage._id, forRole: 'admin' });
+
+    res.status(201).json({ message: 'Message sent successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error sending message' });
+  }
 };
+
+
+
+// // GET /api/contact/my-messages
+// exports.getUserMessages = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+//     const messages = await ContactMessage.find({ userId }).sort({ updatedAt: -1 });
+
+//     res.json(messages);
+//   } catch (error) {
+//     res.status(500).json({ message: 'Error fetching user messages' });
+//   }
+// };
+
 
 // Admin gets all contact messages
 exports.getContactMessages = async (req, res) => {
-    try {
-        const messages = await ContactMessage.find()
-            .populate('userId', 'fullName email')
-            .sort({ createdAt: -1 });
-        res.json(messages);
-    } catch (error) {
-        res.status(500).json({ message: 'Error fetching messages' });
-    }
+  try {
+    const messages = await ContactMessage.find()
+      .populate('userId', 'fullName email')
+      .sort({ updatedAt: -1 });
+
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching messages' });
+  }
 };
 
 // Admin replies to message
 exports.replyToMessage = async (req, res) => {
-    try {
-        const { messageId } = req.params;
-        const { reply } = req.body;
-        
-        await ContactMessage.findByIdAndUpdate(messageId, {
-            adminReply: reply,
-            status: 'replied',
-            repliedAt: new Date()
-        });
-        
-        res.json({ message: 'Reply sent successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error sending reply' });
+  try {
+    const { messageId } = req.params;
+    const { reply } = req.body;
+    const role = req.user.role === 'admin' ? 'admin' : 'user';
+
+    const contactMessage = await ContactMessage.findById(messageId);
+    if (!contactMessage) {
+      return res.status(404).json({ message: 'Conversation not found' });
     }
+
+    contactMessage.messages.push({
+      senderRole: role,
+      text: reply
+    });
+    contactMessage.status = 'replied';
+    await contactMessage.save();
+
+    // 🔔 Create notification for the opposite role
+    // const notifyRole = role === 'admin' ? 'user' : 'admin';
+    // await Notification.create({ type: 'contact-reply', refId: contactMessage._id, forRole: notifyRole });
+
+    res.json({ message: 'Reply sent successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error sending reply' });
+  }
 };
+
+
+exports.getConversation = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const conversation = await ContactMessage.findById(messageId)
+      .populate('userId', 'fullName email');
+
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+
+    res.json(conversation);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching conversation' });
+  }
+};
+
+
 
 
 
