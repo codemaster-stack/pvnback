@@ -1,17 +1,21 @@
-// routes/transactionRoutes.js
 const express = require('express');
-const { getUserTransactions,  transfer} = require('../controllers/transactionController');
-const { protect } = require('../middleware/auth'); // your JWT auth middleware
-// const { adMinauth } = require('../middleware/adminAuth');
+const {
+  getUserTransactions,
+  transfer,
+ 
+} = require('../controllers/transactionController');
+const { downloadStatement } = require('../controllers/userController');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Fetch all user transactions (with optional date filters)
 router.get('/', protect, getUserTransactions);
-// routes/userDashboard.js
-// router.post("/account/:fromAccountId/transfer", protect, transfer);
-// routes/transactionRoutes.js
-router.post("/transfer", protect, transfer);
 
+// Make a transfer
+router.post('/transfer', protect, transfer);
 
+// Download statements as PDF
+router.get('/statements', protect, downloadStatement);
 
 module.exports = router;

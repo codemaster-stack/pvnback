@@ -10,40 +10,104 @@ const ContactMessage = require('../models/Contact');
 exports.submitContactMessage = async (req, res) => {
   try {
     const { subject, message, email, phone } = req.body;
+    const userId = req.user.id;
 
-const contactMessage = new ContactMessage({
-  userId: req.user.id,
-  email,              // <-- store email
-  phone,              // <-- store phone
-  subject,
-  messages: [{ senderRole: 'user', text: message }]
-});
-
+    const contactMessage = new ContactMessage({
+      userId,
+      email,
+      phone,
+      subject,
+      message,
+      replies: [{ senderRole: 'user', message }]
+    });
 
     await contactMessage.save();
 
-    // 🔔 Create notification for admin
-    // await Notification.create({ type: 'contact', refId: contactMessage._id, forRole: 'admin' });
-
     res.status(201).json({ message: 'Message sent successfully' });
   } catch (error) {
+    console.error('Error saving contact message:', error);
     res.status(500).json({ message: 'Error sending message' });
   }
 };
 
 
 
-// // GET /api/contact/my-messages
-// exports.getUserMessages = async (req, res) => {
-//   try {
-//     const userId = req.user.id;
-//     const messages = await ContactMessage.find({ userId }).sort({ updatedAt: -1 });
+exports.downloadStatement = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
-//     res.json(messages);
-//   } catch (error) {
-//     res.status(500).json({ message: 'Error fetching user messages' });
-//   }
-// };
+    // Find user's account
+    const account = await Account.findOne({ userId });
+    if (!account) {
+      return res.status(404).json({ message: 'No account found for user' });
+    }
+
+    // Fetch latest 100 transactions
+    const transactions = await Transaction.findByAccountId(account._id, 100);
+
+    // Create PDF
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const filename = `statement_${Date.now()}.pdf`;
+
+    // Set headers for download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    doc.pipe(res);
+
+    // Title
+    doc.fontSize(20).text('Supapay Transaction Statement', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`Account Number: ${account.accountNumber || 'N/A'}`);
+    doc.text(`Generated On: ${new Date().toLocaleString()}`);
+    doc.moveDown();
+
+    // If no transactions
+    if (transactions.length === 0) {
+      doc.fontSize(14).text('No transactions available for this period.', { align: 'center' });
+      doc.end();
+      return;
+    }
+
+    // Table Header
+    doc.fontSize(13).text('Date', 50, doc.y, { continued: true });
+    doc.text('Description', 150, doc.y, { continued: true });
+    doc.text('Amount', 350, doc.y, { continued: true });
+    doc.text('Balance After', 450);
+    doc.moveDown();
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown(0.5);
+
+    // Transactions Table
+    transactions.forEach(tx => {
+      const date = new Date(tx.transactionDate).toLocaleDateString();
+      const amountFormatted = `₦${Math.abs(tx.amount).toLocaleString()}`;
+      const amountColor = tx.amount < 0 ? 'red' : 'green';
+
+      doc.fontSize(11).fillColor('black').text(date, 50, doc.y, { continued: true });
+      doc.text(tx.description || '-', 150, doc.y, { continued: true });
+      doc.fillColor(amountColor).text(
+        `${tx.amount < 0 ? '-' : '+'}${amountFormatted}`,
+        350,
+        doc.y,
+        { continued: true }
+      );
+      doc.fillColor('black').text(`₦${tx.balanceAfter.toLocaleString()}`, 450);
+      doc.moveDown();
+    });
+
+    // Footer
+    doc.moveDown();
+    doc.fontSize(10).fillColor('gray').text(
+      'This is a system-generated statement. If you have questions, contact Supapay Support.',
+      { align: 'center' }
+    );
+
+    doc.end();
+  } catch (error) {
+    console.error('Error generating statement:', error);
+    res.status(500).json({ message: 'Error generating statement' });
+  }
+};
 
 
 // Admin gets all contact messages
