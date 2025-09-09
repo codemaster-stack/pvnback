@@ -9,6 +9,7 @@ const adminRoutes = require("./routes/admin");
 const { protect } = require("./middleware/auth");
 const ChatMessage = require("./models/ChatMessage"); // You'll create this
 const jwt = require("jsonwebtoken");
+const contactRoutes = require('./routes/contact');
 
 const cors = require("cors");
 
@@ -36,12 +37,16 @@ app.use(cors({
 
 // Parse JSON
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
 
 // --- Routes ---
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/user/dashboard", userDashboardRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use("/api/admin", protect, adminRoutes);
+app.use('/api', contactRoutes);
 
 // Socket.IO Authentication Middleware
 io.use(async (socket, next) => {
