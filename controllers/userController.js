@@ -7,17 +7,18 @@ const ContactMessage = require('../models/Contact');
 
 
 // User submits contact form
-// userController.js
 exports.submitContactMessage = async (req, res) => {
   try {
-    const { subject, message } = req.body;
-    const userId = req.user.id;
+    const { subject, message, email, phone } = req.body;
 
-    const contactMessage = new ContactMessage({
-      userId,
-      subject,
-      messages: [{ senderRole: 'user', text: message }]
-    });
+const contactMessage = new ContactMessage({
+  userId: req.user.id,
+  email,              // <-- store email
+  phone,              // <-- store phone
+  subject,
+  messages: [{ senderRole: 'user', text: message }]
+});
+
 
     await contactMessage.save();
 

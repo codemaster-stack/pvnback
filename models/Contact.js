@@ -4,6 +4,9 @@ const mongoose = require('mongoose');
 const contactMessageSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
+  email: { type: String },  // <-- NEW FIELD
+  phone: { type: String },  // <-- NEW FIELD
+
   subject: { type: String, required: true },
   message: { type: String, required: true },
 
@@ -20,6 +23,7 @@ const contactMessageSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
+
 
 // Auto-update updatedAt
 contactMessageSchema.pre('save', function (next) {
