@@ -2,7 +2,7 @@
 const User = require("../models/User");
 const Account = require("../models/Account");
 const Transaction = require("../models/Transaction");
-const ContactMessage = require('../models/Contact');
+const ContactMessage = require("../models/Contact");
 const PDFDocument = require("pdfkit");
 
 
@@ -70,7 +70,8 @@ exports.downloadStatement = async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
 
     // ✅ Start generating PDF
-    const doc = new PDFDocument({ margin: 40, size: "A4" });
+   const doc = new PDFDocument({ margin: 60, size: "A4" }); // increased margin
+
     doc.pipe(res);
 
     // ✅ Title
@@ -89,12 +90,14 @@ exports.downloadStatement = async (req, res) => {
       return;
     }
 
+        
+
     // ✅ Table Header
     doc.fontSize(13).fillColor("black");
-    doc.text("Date", 50, doc.y, { continued: true });
-    doc.text("Description", 150, doc.y, { continued: true });
-    doc.text("Amount", 350, doc.y, { continued: true });
-    doc.text("Balance After", 450);
+    doc.text("Date", 60, doc.y, { continued: true });
+    doc.text("Description", 160, doc.y, { continued: true });
+    doc.text("Amount", 360, doc.y, { continued: true });
+    doc.text("Balance After", 460);
     doc.moveDown();
     doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
     doc.moveDown(0.5);
@@ -108,8 +111,15 @@ exports.downloadStatement = async (req, res) => {
       const amountFormatted = `₦${Math.abs(tx.amount).toLocaleString()}`;
       const amountColor = tx.amount < 0 ? "red" : "green";
 
+  doc.text(date, 60, doc.y, { continued: true });
+
+doc.text(`${tx.amount < 0 ? "-" : "+"}${amountFormatted}`, 360, doc.y, { continued: true });
+doc.text(`₦${tx.balanceAfter.toLocaleString()}`, 460);
+    
+
+
       doc.fontSize(11).fillColor("black").text(date, 50, doc.y, { continued: true });
-      doc.text(tx.description || "-", 150, doc.y, { continued: true });
+      doc.text(tx.description || "-", 160, doc.y, { continued: true });
       doc.fillColor(amountColor).text(
         `${tx.amount < 0 ? "-" : "+"}${amountFormatted}`,
         350,

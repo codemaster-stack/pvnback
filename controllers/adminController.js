@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Account = require("../models/Account"); // if needed
 const sendEmail = require("../utils/sendEmail");
 const Transaction = require("../models/Transaction");
+const ContactMessage = require("../models/Contact" );
 
 // GET all users
 exports.getAllUsers = async (req, res) => {
@@ -117,5 +118,19 @@ exports.sendEmailToUser = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to send email" });
+  }
+};
+
+
+exports.getContactMessages = async (req, res) => {
+  try {
+    const messages = await ContactMessage.find()
+      .populate('userId', 'fullName email')  // include user info
+      .sort({ createdAt: -1 });
+
+    res.json(messages);
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({ message: 'Error fetching messages' });
   }
 };

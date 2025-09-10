@@ -4,12 +4,13 @@ const {
   getAllUsers,
   deleteUser,
   sendEmailToUser,
-  fundUserAccount
+  fundUserAccount,
+  getContactMessages
 } = require('../controllers/adminController');
 const adminAuth = require('../middleware/adminAuth');
-const { replyToMessage, getContactMessages } = require('../controllers/userController');
+const { replyToMessage } = require('../controllers/userController');
 // FIX 1: Add sendMessage, getChatMessages, getNewMessages to imports
-const { getActiveChatSessions, getUserChatHistory, getChatStats, sendMessage, getChatMessages, getNewMessages } = require("../controllers/chatController");
+const { getActiveChatSessions, getUserChatHistory, getChatStats, sendMessage, getChatMessages, getNewMessages  } = require("../controllers/chatController");
 
 const router = express.Router();
 const { protect } = require('../middleware/auth'); // Import JWT middleware
@@ -43,7 +44,7 @@ router.post('/message', sendMessage);
 router.get('/messages/:sessionId', getChatMessages);
 router.get('/messages/:sessionId/new', getNewMessages);
 
-// router.get('/contact-messages', getContactMessages);
+router.get('/contact-messages', getContactMessages);
 
 
 module.exports = router;
