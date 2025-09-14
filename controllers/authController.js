@@ -110,18 +110,20 @@ exports.forgotPassword = async (req, res) => {
 
     // Generate reset token
     const resetToken = crypto.randomBytes(20).toString("hex");
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password.html?token=${resetToken}`;
 
-    // Save token temporarily (simple way)
+    // Update the URL to your index page where the modal is
+    const resetUrl = `${process.env.FRONTEND_URL}/?token=${resetToken}`;
+
+    // Save token temporarily
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 min
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save();
 
-   await sendEmail({
-  to: user.email,
-  subject: "Password Reset Request",
-  text: `You requested a password reset. Please use this link: ${resetUrl}`,
-});
+    await sendEmail({
+      to: user.email,
+      subject: "Password Reset Request",
+      text: `You requested a password reset. Please use this link: ${resetUrl}`,
+    });
 
     res.json({ message: "Email sent successfully" });
   } catch (error) {
