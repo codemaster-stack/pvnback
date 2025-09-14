@@ -131,18 +131,28 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
+
 // @desc Reset Password
 exports.resetPassword = async (req, res) => {
   try {
+    // Get token from body (modal sends it in hidden input)
     const { token, password } = req.body;
 
+    if (!token) {
+      return res.status(400).json({ message: "Token is required" });
+    }
+
+    // Find user with matching token and not expired
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpire: { $gt: Date.now() },
     });
 
-    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
 
+    // Update password and clear token fields
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
@@ -150,6 +160,8 @@ exports.resetPassword = async (req, res) => {
 
     res.json({ message: "Password reset successful" });
   } catch (error) {
+    console.error("Reset password error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
