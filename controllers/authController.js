@@ -117,11 +117,10 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 min
     await user.save();
 
-    await sendEmail({
+   await sendEmail({
   to: user.email,
   subject: "Password Reset Request",
-  text: `You requested a password reset. Copy and paste this link: ${resetUrl}`,
-  html: `<p>You requested a password reset. Click <a href="${resetUrl}">here</a> to reset your password.</p>`,
+  text: `You requested a password reset. Please use this link: ${resetUrl}`,
 });
 
     res.json({ message: "Email sent successfully" });
