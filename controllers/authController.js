@@ -163,7 +163,7 @@ exports.resetPassword = async (req, res) => {
     
     // If we get here, token is valid - proceed with reset
     // Hash password before saving
-    const bcrypt = require('bcrypt');
+    const bcrypt = require('bcryptjs');
     user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
