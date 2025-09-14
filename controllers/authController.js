@@ -115,37 +115,48 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
-    console.log("Received token from frontend:", token);
     
-    if (!token) return res.status(400).json({ message: "Token is required" });
+    // Debug info object
+    const debugInfo = {
+      receivedToken: token,
+      tokenLength: token ? token.length : 0,
+      currentTime: Date.now(),
+      currentTimeReadable: new Date().toISOString()
+    };
+    
+    if (!token) return res.status(400).json({ message: "Token is required", debug: debugInfo });
     
     // Hash the token before checking DB
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    console.log("Hashed token for lookup:", hashedToken);
-    console.log("Current time:", Date.now());
+    debugInfo.hashedToken = hashedToken;
     
+    // First, let's find ANY user with this hashed token (ignore expiry for now)
+    const userWithToken = await User.findOne({ resetPasswordToken: hashedToken });
+    debugInfo.userWithTokenFound = !!userWithToken;
+    
+    if (userWithToken) {
+      debugInfo.storedToken = userWithToken.resetPasswordToken;
+      debugInfo.tokenExpiry = userWithToken.resetPasswordExpire;
+      debugInfo.tokenExpiryReadable = new Date(userWithToken.resetPasswordExpire).toISOString();
+      debugInfo.isExpired = userWithToken.resetPasswordExpire < Date.now();
+    }
+    
+    // Now check with expiry
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpire: { $gt: Date.now() },
     });
     
-    console.log("User found:", user ? "Yes" : "No");
-    if (user) {
-      console.log("User's stored token:", user.resetPasswordToken);
-      console.log("User's token expiry:", user.resetPasswordExpire);
-      console.log("Token expired?", user.resetPasswordExpire < Date.now());
-    }
+    debugInfo.validUserFound = !!user;
     
     if (!user) {
-      // Let's also check if user exists with this token but expired
-      const expiredUser = await User.findOne({ resetPasswordToken: hashedToken });
-      if (expiredUser) {
-        console.log("Token found but expired. Expiry was:", new Date(expiredUser.resetPasswordExpire));
-        return res.status(400).json({ message: "Token has expired" });
-      }
-      return res.status(400).json({ message: "Invalid token" });
+      return res.status(400).json({ 
+        message: "Invalid or expired token",
+        debug: debugInfo
+      });
     }
     
+    // If we get here, token is valid - proceed with reset
     // Hash password before saving
     const bcrypt = require('bcrypt');
     user.password = await bcrypt.hash(password, 10);
@@ -153,10 +164,15 @@ exports.resetPassword = async (req, res) => {
     user.resetPasswordExpire = undefined;
     await user.save();
     
-    console.log("Password reset successful");
-    res.json({ message: "Password reset successful" });
+    res.json({ 
+      message: "Password reset successful",
+      debug: debugInfo
+    });
   } catch (error) {
     console.error("Reset password error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ 
+      message: "Server error", 
+      error: error.message
+    });
   }
 };
