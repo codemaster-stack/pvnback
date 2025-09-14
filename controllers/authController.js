@@ -111,9 +111,11 @@ exports.resetPassword = async (req, res) => {
 
     if (!token) return res.status(400).json({ message: "Token is required" });
 
-    // Find user by token and expiry
+    // Hash the token before checking DB
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
     const user = await User.findOne({
-      resetPasswordToken: token,
+      resetPasswordToken: hashedToken,
       resetPasswordExpire: { $gt: Date.now() },
     });
 
