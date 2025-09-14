@@ -11,33 +11,6 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
-// @desc Register new user
-// exports.register = async (req, res) => {
-//   try {
-//     const { name, email, phone, password } = req.body;
-
-//     if (!name || !email || !phone || !password) {
-//       return res.status(400).json({ message: "All fields are required" });
-//     }
-
-//     const userExists = await User.findOne({ email });
-//     if (userExists) {
-//       return res.status(400).json({ message: "User already exists" });
-//     }
-
-//     const user = await User.create({ name, email, phone, password });
-
-//     res.status(201).json({
-//       _id: user._id,
-//       name: user.name,
-//       email: user.email,
-//       phone: user.phone,
-//       token: generateToken(user._id),
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: "Server error", error: error.message });
-//   }
-// };
 
 
 exports.register = async (req, res) => {
@@ -104,55 +77,49 @@ exports.login = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
 
+    const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Generate reset token
+    // Generate a plain token
     const resetToken = crypto.randomBytes(20).toString("hex");
 
-    // Update the URL to your index page where the modal is
-    const resetUrl = `${process.env.FRONTEND_URL}/?token=${resetToken}`;
-
-    // Save token temporarily
+    // Store in DB with expiry
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 min
     await user.save();
 
+    // Send token in email (plain text)
+    const resetUrl = `${process.env.FRONTEND_URL}/?resetToken=${resetToken}`;
     await sendEmail({
       to: user.email,
       subject: "Password Reset Request",
-      text: `You requested a password reset. Please use this link: ${resetUrl}`,
+      text: `You requested a password reset. Use this token to reset your password: ${resetToken} \nOr click this link: ${resetUrl}`,
     });
 
-    res.json({ message: "Email sent successfully" });
+    res.json({ message: "Password reset email sent" });
   } catch (error) {
+    console.error("Forgot password error:", error);
     res.status(500).json({ message: "Email could not be sent", error: error.message });
   }
 };
 
-
-// @desc Reset Password
+// --- Reset Password ---
 exports.resetPassword = async (req, res) => {
   try {
-    // Get token from body (modal sends it in hidden input)
     const { token, password } = req.body;
 
-    if (!token) {
-      return res.status(400).json({ message: "Token is required" });
-    }
+    if (!token) return res.status(400).json({ message: "Token is required" });
 
-    // Find user with matching token and not expired
+    // Find user by token and expiry
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpire: { $gt: Date.now() },
     });
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token" });
-    }
+    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
 
-    // Update password and clear token fields
+    // Update password
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
@@ -164,4 +131,3 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
