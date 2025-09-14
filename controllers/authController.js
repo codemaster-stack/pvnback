@@ -83,21 +83,16 @@ exports.forgotPassword = async (req, res) => {
     
     // Generate a plain token
     const resetToken = crypto.randomBytes(20).toString("hex");
-    console.log("Generated plain token:", resetToken);
     
     // Hash it before storing in DB
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
-    console.log("Hashed token for DB:", hashedToken);
     
     user.resetPasswordToken = hashedToken;
     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
     await user.save();
     
-    console.log("Token saved to DB. Expiry:", new Date(user.resetPasswordExpire));
-    
     // Send PLAIN token in email
     const resetUrl = `${process.env.FRONTEND_URL}/?resetToken=${resetToken}`;
-    console.log("Reset URL:", resetUrl);
     
     await sendEmail({
       to: user.email,
@@ -105,7 +100,17 @@ exports.forgotPassword = async (req, res) => {
       text: `You requested a password reset. Click this link: ${resetUrl}`,
     });
     
-    res.json({ message: "Password reset email sent" });
+    // Return debug info
+    res.json({ 
+      message: "Password reset email sent",
+      debug: {
+        plainToken: resetToken,
+        hashedToken: hashedToken,
+        tokenExpiry: user.resetPasswordExpire,
+        tokenExpiryReadable: new Date(user.resetPasswordExpire).toISOString(),
+        resetUrl: resetUrl
+      }
+    });
   } catch (error) {
     console.error("Forgot password error:", error);
     res.status(500).json({ message: "Email could not be sent", error: error.message });
