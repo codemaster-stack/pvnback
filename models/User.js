@@ -1,4 +1,3 @@
-
 // models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
@@ -10,6 +9,9 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, required: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    // ADD THESE MISSING FIELDS:
+    resetPasswordToken: { type: String },
+    resetPasswordExpire: { type: Date },
   },
   { timestamps: true }
 );
