@@ -56,7 +56,8 @@ const {
   registerAdmin,
   loginAdmin,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  getAllUsers
 } = require("../controllers/adminController");
 
 // @route POST /api/auth/admin/register
@@ -70,5 +71,6 @@ router.post("/forgot-password", forgotPassword);
 
 // @route POST /api/auth/admin/reset-password/:token
 router.post("/reset-password/:token", resetPassword);
+router.get("/get-users", getAllUsers)
 
 module.exports = router;
