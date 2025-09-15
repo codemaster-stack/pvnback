@@ -2,6 +2,15 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
+const transactionSchema = new mongoose.Schema({
+  date: { type: Date, default: Date.now },
+  description: String,
+  amount: Number,
+  type: { type: String, enum: ["inflow", "outflow"] },
+  status: { type: String, default: "completed" },
+  balance: Number
+});
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -9,9 +18,26 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, required: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
-    // ADD THESE MISSING FIELDS:
+
+    // balances
+    balances: {
+      current: { type: Number, default: 0 },
+      savings: { type: Number, default: 0 },
+      loan: { type: Number, default: 0 }
+    },
+
+    // transactions
+    transactions: [transactionSchema],
+
+    transactionPin: { type: String, default: null },
+
+
+    // login tracking
+    lastLoginIp: { type: String },
+    lastLoginDate: { type: Date },
+
     resetPasswordToken: { type: String },
-    resetPasswordExpire: { type: Date },
+    resetPasswordExpire: { type: Date }
   },
   { timestamps: true }
 );
