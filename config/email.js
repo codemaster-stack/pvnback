@@ -1,31 +1,14 @@
-// // config/email.js
-// const nodemailer = require("nodemailer");
-
-// const createTransporter = () => {
-//   return nodemailer.createTransport({
-//     host: process.env.EMAIL_HOST,      // e.g., smtp.gmail.com or smtp.mailtrap.io
-//     port: process.env.EMAIL_PORT,      // 465 (SSL) or 587 (TLS)
-//     secure: process.env.EMAIL_SECURE === "true", // true for 465, false for 587
-//     auth: {
-//       user: process.env.EMAIL_USER,
-//       pass: process.env.EMAIL_PASS,
-//     },
-//   });
-// };
-
-// module.exports = createTransporter;
-
-
+// config/email.js
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.zoho.com",
-  port: 465,
-  secure: true, // SSL
+const emailTransporter = nodemailer.createTransport({
+  host: "smtp.zoho.com",   // Zoho SMTP server
+  port: 465,               // Use 465 for SSL
+  secure: true,            // true = SSL, false = TLS
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: process.env.EMAIL_USER, // your Zoho email e.g. name@pvbonline.online
+    pass: process.env.EMAIL_PASS, // your Zoho email password or app password
   },
 });
 
-module.exports = transporter;
+module.exports = emailTransporter;
