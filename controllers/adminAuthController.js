@@ -76,13 +76,13 @@ exports.forgotPassword = async (req, res, next) => {
     await admin.save();
 
     // Create reset URL (frontend link)
-    const resetUrl = `${process.env.FRONTEND_URL}/admindashboard.html?resetToken=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL}/admin-signup.html?resetToken=${resetToken}`;
 
     // Send email
     await sendEmail({
       email: admin.email,
       subject: "PVNBank Admin Password Reset",
-      message: `You requested a password reset. Click here to reset your password:\n\n${resetUrl}\n\nThis link will expire in 15 minutes.`,
+      message: `You requested a password reset. Click here to reset your password:\n\n${resetUrl}\n\nThis link will expire in 25 minutes.`,
     });
 
     res.json({ message: "Reset link sent to your email" });
