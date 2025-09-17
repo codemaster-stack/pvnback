@@ -2,12 +2,12 @@
 const nodemailer = require("nodemailer");
 
 const emailTransporter = nodemailer.createTransport({
-  host: "smtp.zoho.com",   // Zoho SMTP server
-  port: 465,               // Use 465 for SSL
-  secure: true,            // true = SSL, false = TLS
+  host: process.env.ZOHO_HOST || "smtp.zoho.com",
+  port: process.env.ZOHO_PORT || 587,
+  secure: process.env.ZOHO_PORT == 465, // SSL if port=465, otherwise TLS
   auth: {
-    user: process.env.EMAIL_USER, // your Zoho email e.g. name@pvbonline.online
-    pass: process.env.EMAIL_PASS, // your Zoho email password or app password
+    user: process.env.ZOHO_EMAIL,
+    pass: process.env.ZOHO_PASS,
   },
 });
 

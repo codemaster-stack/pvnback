@@ -1,495 +1,163 @@
-// controllers/userDashboardController.js
 const User = require("../models/User");
-const Account = require("../models/Account");
-const Transaction = require("../models/Transaction");
-const ContactMessage = require("../models/Contact");
-const PDFDocument = require("pdfkit");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
+const sendEmail = require("../utils/sendEmail");
 
 
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+};
 
-// User submits contact form
-exports.submitContactMessage = async (req, res) => {
+// Generate random 10-digit account number
+const generateAccountNumber = () =>
+  Math.floor(1000000000 + Math.random() * 9000000000).toString();
+
+// Ensure unique account number
+const generateUniqueAccountNumber = async (field) => {
+  let accountNumber;
+  let exists = true;
+
+  while (exists) {
+    accountNumber = generateAccountNumber();
+    const existingUser = await User.findOne({ [field]: accountNumber });
+    if (!existingUser) {
+      exists = false;
+    }
+  }
+  return accountNumber;
+};
+
+// @desc Register new user
+exports.register = async (req, res) => {
   try {
-    const { subject, message, email, phone } = req.body;
-    const userId = req.user._id;
+    const { fullname, email, phone, password } = req.body;
 
-    const contactMessage = new ContactMessage({
-      userId,
+    if (!fullname || !email || !phone || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const savingsAccountNumber = await generateUniqueAccountNumber("savingsAccountNumber");
+    const currentAccountNumber = await generateUniqueAccountNumber("currentAccountNumber");
+
+    const user = new User({
+      fullname,
       email,
       phone,
-      subject,
-      message,
-      replies: [{ senderRole: 'user', message }]
+      password,
+      savingsAccountNumber,
+      currentAccountNumber,
     });
 
-    await contactMessage.save();
+    await user.save();
 
-    res.status(201).json({ message: 'Message sent successfully' });
-  } catch (error) {
-    console.error('Error saving contact message:', error);
-    res.status(500).json({ message: 'Error sending message' });
+    res.status(201).json({
+      _id: user._id,
+      fullname: user.fullname,
+      email: user.email,
+      phone: user.phone,
+      savingsAccountNumber: user.savingsAccountNumber,
+      currentAccountNumber: user.currentAccountNumber,
+      token: generateToken(user._id),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
 
 
-
-exports.downloadStatement = async (req, res) => {
+// @desc Login user
+exports.login = async (req, res) => {
   try {
-    // ✅ Check if user is authenticated
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Unauthorized: No user found" });
-    }
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
 
-    const userId = req.user.id;
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
-    // ✅ Get user details
-    const user = await User.findById(userId).select("fullName email");
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+
+    res.json({
+      _id: user._id,
+      fullname: user.fullname,
+      email: user.email,
+      phone: user.phone,
+      savingsAccountNumber: user.savingsAccountNumber,
+      currentAccountNumber: user.currentAccountNumber,
+      token: generateToken(user._id),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc Forgot password
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ✅ Get user's account
-    const account = await Account.findOne({ userId });
-    if (!account) {
-      return res.status(404).json({ message: "No account found for user" });
-    }
+    // Create a plain reset token
+    const resetToken = crypto.randomBytes(20).toString("hex");
 
-    // ✅ Fetch the latest 100 transactions for this account
-    const transactions = await Transaction.find({
-      $or: [
-        { fromAccountId: account._id },
-        { toAccountId: account._id }
-      ]
-    })
-      .sort({ transactionDate: -1 })
-      .limit(100);
+    // Hash token before saving to DB
+    user.resetToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+    user.resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save();
 
-    // ✅ Set up PDF headers
-    const filename = `${user.fullName.replace(/\s+/g, "_")}_statement_${Date.now()}.pdf`;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    // Create reset URL (frontend link)
+    const resetUrl = `${process.env.FRONTEND_URL}/index.html?resetToken=${resetToken}`;
 
-    // ✅ Start generating PDF
-   const doc = new PDFDocument({ margin: 60, size: "A4" }); // increased margin
-
-    doc.pipe(res);
-
-    // ✅ Title
-    doc.fontSize(20).text(`${user.fullName}'s Transaction Statement`, { align: "center" });
-    doc.moveDown();
-    doc.fontSize(12).text(`Account Holder: ${user.fullName}`);
-    doc.text(`Account Number: ${account.accountNumber || "N/A"}`);
-    doc.text(`Email: ${user.email || "N/A"}`);
-    doc.text(`Generated On: ${new Date().toLocaleString()}`);
-    doc.moveDown();
-
-    // ✅ If no transactions
-    if (!transactions || transactions.length === 0) {
-      doc.fontSize(14).text("No transactions available for this period.", { align: "center" });
-      doc.end();
-      return;
-    }
-
-        
-
-    // ✅ Table Header
-    doc.fontSize(13).fillColor("black");
-    doc.text("Date", 60, doc.y, { continued: true });
-    doc.text("Description", 160, doc.y, { continued: true });
-    doc.text("Amount", 360, doc.y, { continued: true });
-    doc.text("Balance After", 460);
-    doc.moveDown();
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-    doc.moveDown(0.5);
-
-    // ✅ Transaction Rows
-    transactions.forEach((tx) => {
-      const date = tx.transactionDate
-        ? new Date(tx.transactionDate).toLocaleDateString()
-        : new Date(tx.createdAt).toLocaleDateString();
-
-      const amountFormatted = `₦${Math.abs(tx.amount).toLocaleString()}`;
-      const amountColor = tx.amount < 0 ? "red" : "green";
-
-  doc.text(date, 60, doc.y, { continued: true });
-
-doc.text(`${tx.amount < 0 ? "-" : "+"}${amountFormatted}`, 360, doc.y, { continued: true });
-doc.text(`₦${tx.balanceAfter.toLocaleString()}`, 460);
-    
-
-
-      doc.fontSize(11).fillColor("black").text(date, 50, doc.y, { continued: true });
-      doc.text(tx.description || "-", 160, doc.y, { continued: true });
-      doc.fillColor(amountColor).text(
-        `${tx.amount < 0 ? "-" : "+"}${amountFormatted}`,
-        350,
-        doc.y,
-        { continued: true }
-      );
-      doc.fillColor("black").text(`₦${tx.balanceAfter.toLocaleString()}`, 450);
-      doc.moveDown();
+    // Send email
+    await sendEmail({
+      email: user.email,
+      subject: "PVNBank User Password Reset",
+      message: `You requested a password reset. Click here to reset your password:\n\n${resetUrl}\n\nThis link will expire in 25 minutes.`,
     });
 
-    // ✅ Footer
-    doc.moveDown();
-    doc.fontSize(10).fillColor("gray").text(
-      "This is a system-generated statement. If you have questions, contact PVN Bank Support.",
-      { align: "center" }
-    );
-
-    // ✅ End PDF stream
-    doc.end();
+    res.json({ message: "Reset link sent to your email" });
   } catch (error) {
-    console.error("❌ Error generating statement:", error);
-    if (!res.headersSent) {
-      res.status(500).json({ message: "Error generating statement" });
-    }
+    next(error);
   }
 };
 
-// Admin replies to message
-exports.replyToMessage = async (req, res) => {
+// @desc    Reset password
+exports.resetPassword = async (req, res, next) => {
   try {
-    const { messageId } = req.params;
-    const { reply } = req.body;
-    const role = req.user.role === 'admin' ? 'admin' : 'user';
+    const token = req.body.token || req.params.token || req.query.resetToken;
+    const { password } = req.body;
 
-    const contactMessage = await ContactMessage.findById(messageId);
-    if (!contactMessage) {
-      return res.status(404).json({ message: 'Conversation not found' });
+    if (!token) {
+      return res.status(400).json({ message: "Reset token is missing" });
     }
 
-    contactMessage.messages.push({
-      senderRole: role,
-      text: reply
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetToken: hashedToken,
+      resetTokenExpiry: { $gt: Date.now() },
     });
-    contactMessage.status = 'replied';
-    await contactMessage.save();
 
-    // 🔔 Create notification for the opposite role
-    // const notifyRole = role === 'admin' ? 'user' : 'admin';
-    // await Notification.create({ type: 'contact-reply', refId: contactMessage._id, forRole: notifyRole });
-
-    res.json({ message: 'Reply sent successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error sending reply' });
-  }
-};
-
-
-exports.getConversation = async (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const conversation = await ContactMessage.findById(messageId)
-      .populate('userId', 'fullName email');
-
-    if (!conversation) {
-      return res.status(404).json({ message: 'Conversation not found' });
-    }
-
-    res.json(conversation);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching conversation' });
-  }
-};
-
-
-
-
-
-// 🔹 ROBUST: Get user profile with fallback for existing users
-exports.getUserProfile = async (req, res) => {
-  try {
-    // Check if req.user exists (from protect middleware)
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
-
-    const userId = req.user.id;
-    
-    // Get user info
-    const user = await User.findById(userId).select('fullName email phone role');
-    
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(400).json({ message: "Invalid or expired reset token" });
     }
 
-    // Handle admin users (they don't have accounts)
-    if (user.role === 'admin') {
-      return res.json({
-        user: {
-          fullName: user.fullName,
-          email: user.email,
-          role: 'admin'
-        }
-      });
-    }
+    user.password = password;
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save();
 
-    // 🔹 FIXED: Try to find existing account first
-    let account = await Account.findOne({ userId });
-    
-    // If no account exists, try to create one with better error handling
-    if (!account) {
-      try {
-        // Generate a simple account number (avoid complex pre-save hooks for now)
-        const accountNumber = Date.now().toString().slice(-10); // Last 10 digits of timestamp
-        
-        account = new Account({
-          userId,
-          accountNumber,
-          accountType: "savings",
-          balance: 0,
-          isActive: true
-        });
-        
-        await account.save();
-      } catch (createError) {
-        // If account creation fails, return user info without account details
-        // This allows existing users to login even if account creation fails
-        return res.json({
-          user: {
-            fullName: user.fullName,
-            email: user.email,
-            phone: user.phone,
-            accountNumber: "Account setup pending...",
-            balance: 0
-          }
-        });
-      }
-    }
-
-    // Return user with account info
-    return res.json({
-      user: {
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        accountNumber: account.accountNumber,
-        balance: account.balance
-      }
-    });
-
+    res.json({ message: "Password updated successfully" });
   } catch (error) {
-    console.error('Profile error:', error.message);
-    
-    // 🔹 FALLBACK: If everything fails, try to return basic user info
-    try {
-      const userId = req.user?.id;
-      if (userId) {
-        const user = await User.findById(userId).select('fullName email phone');
-        if (user) {
-          return res.json({
-            user: {
-              fullName: user.fullName,
-              email: user.email,
-              phone: user.phone,
-              accountNumber: "System maintenance...",
-              balance: 0
-            }
-          });
-        }
-      }
-    } catch (fallbackError) {
-      // Even fallback failed
-    }
-    
-    res.status(500).json({ 
-      message: 'Server error loading profile'
-    });
+    next(error);
   }
-};
-
-// Keep your other functions
-exports.getUserAccounts = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const accounts = await Account.find({ userId, isActive: true });
-    
-    res.json({
-      accounts: accounts.map(account => ({
-        _id: account._id,
-        accountNumber: account.accountNumber,
-        accountType: account.accountType,
-        balance: account.balance,
-        createdAt: account.createdAt
-      }))
-    });
-  } catch (error) {
-    console.error('Get accounts error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-exports.getAccountDetails = async (req, res) => {
-  try {
-    const { accountId } = req.params;
-    const userId = req.user.id;
-
-    const account = await Account.findOne({ 
-      _id: accountId, 
-      userId,
-      isActive: true 
-    });
-
-    if (!account) {
-      return res.status(404).json({ message: 'Account not found' });
-    }
-
-    res.json({
-      account: {
-        _id: account._id,
-        accountNumber: account.accountNumber,
-        accountType: account.accountType,
-        balance: account.balance,
-        createdAt: account.createdAt
-      }
-    });
-  } catch (error) {
-    console.error('Get account details error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-exports.deposit = async (req, res) => {
-  try {
-    const { accountId } = req.params;
-    const { amount, description } = req.body;
-    const userId = req.user.id;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Invalid amount' });
-    }
-
-    const account = await Account.findOne({ 
-      _id: accountId, 
-      userId,
-      isActive: true 
-    });
-
-    if (!account) {
-      return res.status(404).json({ message: 'Account not found' });
-    }
-
-    account.balance += parseFloat(amount);
-    await account.save();
-
-    res.json({
-      message: 'Deposit successful',
-      account: {
-        _id: account._id,
-        accountNumber: account.accountNumber,
-        balance: account.balance
-      }
-    });
-  } catch (error) {
-    console.error('Deposit error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-exports.withdraw = async (req, res) => {
-  try {
-    const { accountId } = req.params;
-    const { amount, description } = req.body;
-    const userId = req.user.id;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Invalid amount' });
-    }
-
-    const account = await Account.findOne({ 
-      _id: accountId, 
-      userId,
-      isActive: true 
-    });
-
-    if (!account) {
-      return res.status(404).json({ message: 'Account not found' });
-    }
-
-    if (account.balance < amount) {
-      return res.status(400).json({ message: 'Insufficient funds' });
-    }
-
-    account.balance -= parseFloat(amount);
-    await account.save();
-
-    res.json({
-      message: 'Withdrawal successful',
-      account: {
-        _id: account._id,
-        accountNumber: account.accountNumber,
-        balance: account.balance
-      }
-    });
-  } catch (error) {
-    console.error('Withdraw error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-
-// Express.js logout route handler
-// POST /api/auth/logout
-
-exports.logout = async (req, res) => {
-    try {
-        // Get the authorization header
-        const authHeader = req.headers.authorization;
-        
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({
-                success: false,
-                message: 'No valid token provided'
-            });
-        }
-
-        // Extract the token
-        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-        // Option 1: If using JWT with a blacklist/invalidation system
-        // Add the token to a blacklist (Redis, database, or in-memory store)
-        try {
-            // Example with Redis (uncomment if using Redis)
-            // await redisClient.setex(`blacklist_${token}`, 3600, 'true'); // Blacklist for 1 hour
-            
-            // Example with database (uncomment if using database)
-            // await BlacklistedToken.create({ token, expiresAt: new Date(Date.now() + 3600000) });
-            
-            console.log('Token blacklisted successfully');
-        } catch (blacklistError) {
-            console.error('Error blacklisting token:', blacklistError);
-            // Don't fail the logout if blacklisting fails
-        }
-
-        // Option 2: If using sessions instead of JWT
-        // req.session.destroy((err) => {
-        //     if (err) {
-        //         console.error('Session destruction error:', err);
-        //     }
-        // });
-
-        // Clear any HTTP-only cookies if you're using them
-        res.clearCookie('authToken', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
-        });
-
-        // Log the logout action (optional)
-        console.log(`User logged out at ${new Date().toISOString()}`);
-
-        // Return success response
-        return res.status(200).json({
-            success: true,
-            message: 'Logged out successfully'
-        });
-
-    } catch (error) {
-        console.error('Logout error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error during logout'
-        });
-    }
 };

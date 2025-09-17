@@ -9,8 +9,6 @@ router.get("/dashboard", protectAdmin, (req, res) => {
 });
 
 
-
-
 const {
   registerAdmin,
   loginAdmin,
@@ -28,25 +26,3 @@ router.post("/reset", resetPassword);
 module.exports = router;
 
 
-
-// const express = require("express");
-// const router = express.Router();
-// const { protectAdmin } = require("../middleware/adminMiddleware");
-
-// // Example protected route
-// // router.get("/dashboard", protectAdmin, (req, res) => {
-// //   res.json({ message: `Welcome Admin` });
-// // });
-
-// const {
-//   registerAdmin,
-//   loginAdmin,
-//   forgotPassword,
-//   resetPassword,
-// } = require("../controllers/adminAuthController");
-
-// // Public routes
-// router.post("/register", registerAdmin);
-// router.post("/login", loginAdmin);
-// router.post("/forgot", forgotPassword);
-// module.exports = router;
