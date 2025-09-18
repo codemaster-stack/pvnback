@@ -8,6 +8,7 @@ const adminAuthRoutes = require("./routes/adminAuthRoutes");
 const errorHandler = require("./middleware/errorHandler");
 const userRoutes = require("./routes/userRoutes");
 const contactRoutes = require("./routes/contactRoutes")
+const publicLoanRoutes = require("./routes/publicLoanRoutes");
 
 
 const path = require("path");
@@ -27,6 +28,7 @@ app.use(cors());
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/contact", contactRoutes)
+app.use("/api/public/loans", publicLoanRoutes);
 
 
 
