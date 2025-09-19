@@ -378,17 +378,36 @@ exports.resetPin = async (req, res) => {
   }
 };
 
-
 exports.getMe = async (req, res) => {
   try {
-    if (!req.user) return res.status(404).json({ message: "User not found" });
+    if (!req.user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    const { fullname, email, profilePic, balances } = req.user; 
-    res.json({ fullname, email, profilePic, balances });
+    const {
+      fullname,
+      email,
+      phone,
+      profilePic,
+      balances,
+      savingsAccountNumber,
+      currentAccountNumber,
+    } = req.user;
+
+    res.json({
+      fullname,
+      email,
+      phone,
+      profilePic,
+      balances,
+      savingsAccountNumber,
+      currentAccountNumber,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 
 // controllers/userController.js
