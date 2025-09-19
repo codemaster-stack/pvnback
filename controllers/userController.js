@@ -251,26 +251,6 @@ exports.getTransactions = async (req, res) => {
 };
 
 
-exports.uploadProfilePicture = async (req, res) => {
-  try {
-    const userId = req.user.id; // assuming you use auth middleware
-    const photoPath = `/uploads/${req.file.filename}`;
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { photo: photoPath },
-      { new: true }
-    );
-
-    res.json({
-      message: "Profile picture updated successfully",
-      photo: user.photo,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
 
 exports.createPin = async (req, res) => {
   try {
@@ -395,5 +375,32 @@ exports.resetPin = async (req, res) => {
   } catch (err) {
     console.error("Error in resetPin:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.getMe = async (req, res) => {
+  try {
+    if (!req.user) return res.status(404).json({ message: "User not found" });
+
+    const { name, email, profilePic } = req.user;
+    res.json({ name, email, profilePic });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// controllers/userController.js
+exports.updateProfilePicture = async (req, res) => {
+  try {
+    if (!req.user) return res.status(404).json({ message: "User not found" });
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+    req.user.profilePic = req.file.path; // store file path in DB
+    await req.user.save();
+
+    res.json({ message: "Profile picture updated", profilePic: req.user.profilePic });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
