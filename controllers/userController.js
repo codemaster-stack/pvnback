@@ -3,6 +3,8 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const sendEmail = require("../utils/sendEmail");
+const CreditCard = require("../models/creditCardModel");
+const Transaction = require("../models/Transaction");
 
 
 const generateToken = (id) => {
@@ -159,5 +161,239 @@ exports.resetPassword = async (req, res, next) => {
     res.json({ message: "Password updated successfully" });
   } catch (error) {
     next(error);
+  }
+};
+
+
+exports.createCreditCard = async (req, res) => {
+  try {
+    const { cardType, cardLimit } = req.body;
+    const userId = req.user.id; // comes from protect middleware
+
+    if (!cardType || !cardLimit) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const newCard = new CreditCard({
+      user: userId,
+      cardType,
+      cardLimit,
+      status: "pending" // pending admin approval
+    });
+
+    await newCard.save();
+
+    res.status(201).json({ message: "Credit card request submitted for approval" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.getDashboard = async (req, res) => {
+  try {
+    const userId = req.user.id; // comes from auth middleware
+    const user = await User.findById(userId);
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Fetch balances from transactions
+    const inflow = await Transaction.aggregate([
+      { $match: { userId, type: "inflow" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    const outflow = await Transaction.aggregate([
+      { $match: { userId, type: "outflow" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+
+    res.json({
+      fullname: user.fullname,
+      email: user.email,
+      phone: user.phone,
+      savingsAccountNumber: user.savingsAccountNumber,
+      currentAccountNumber: user.currentAccountNumber,
+      balances: {
+        savings: user.savingsBalance || 0,
+        current: user.currentBalance || 0,
+        loan: user.loanBalance || 0,
+        inflow: inflow[0]?.total || 0,
+        outflow: outflow[0]?.total || 0,
+      },
+      lastLoginIP: user.lastLoginIP || "N/A",
+      lastLoginDate: user.lastLoginDate || "N/A",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// @desc    Get user transactions (filter by inflow/outflow)
+// @route   GET /api/users/transactions?type=inflow
+// @access  Private
+exports.getTransactions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const type = req.query.type; // inflow or outflow
+
+    const query = { userId };
+    if (type) query.type = type;
+
+    const transactions = await Transaction.find(query).sort({ createdAt: -1 });
+    res.json(transactions);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.uploadProfilePicture = async (req, res) => {
+  try {
+    const userId = req.user.id; // assuming you use auth middleware
+    const photoPath = `/uploads/${req.file.filename}`;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { photo: photoPath },
+      { new: true }
+    );
+
+    res.json({
+      message: "Profile picture updated successfully",
+      photo: user.photo,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
+exports.createPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || pin.length !== 4) {
+      return res.status(400).json({ message: "PIN must be exactly 4 digits" });
+    }
+
+    const hashedPin = await bcrypt.hash(pin, 10);
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { transactionPin: hashedPin },
+      { new: true }
+    );
+
+    res.json({ message: "Transaction PIN set successfully" });
+  } catch (err) {
+    console.error("Error creating PIN:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+// @desc    Check if user has a PIN set
+// @route   GET /api/users/has-pin
+// @access  Private
+exports.hasPin = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("transactionPin");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ hasPin: !!user.transactionPin }); // true if pin exists, false otherwise
+  } catch (err) {
+    console.error("Error checking PIN:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+exports.verifyPin = async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    if (!pin || pin.length !== 4) {
+      return res.status(400).json({ message: "PIN must be exactly 4 digits" });
+    }
+
+    // Fetch user with pin (remember: pin is excluded by default)
+    const user = await User.findById(req.user.id).select("+transactionPin");
+
+    if (!user || !user.transactionPin) {
+      return res.status(400).json({ message: "No PIN set. Please create one first." });
+    }
+
+    const isMatch = await user.matchPin(pin);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid PIN" });
+    }
+
+    res.json({ success: true, message: "PIN verified successfully" });
+  } catch (err) {
+    console.error("Error verifying PIN:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+exports.forgotPin = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 mins
+    await user.save();
+
+    const resetUrl = `https://pvbonline.online/reset-pin.html?token=${resetToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: "Reset Your Transaction PIN",
+      text: `Click the link to reset your PIN: ${resetUrl}`
+    });
+
+    res.json({ message: "Reset instructions sent to your email" });
+  } catch (err) {
+    console.error("Error in forgotPin:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+exports.resetPin = async (req, res) => {
+  try {
+    const { token, newPin } = req.body;
+
+    if (!newPin || newPin.length !== 4) {
+      return res.status(400).json({ message: "PIN must be exactly 4 digits" });
+    }
+
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: Date.now() }
+    });
+
+    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+
+    user.transactionPin = await bcrypt.hash(newPin, 10);
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+
+    await user.save();
+
+    res.json({ message: "✅ PIN reset successful!" });
+  } catch (err) {
+    console.error("Error in resetPin:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

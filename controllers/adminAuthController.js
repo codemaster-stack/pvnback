@@ -120,3 +120,125 @@ exports.resetPassword = async (req, res, next) => {
     next(error);
   }
 };
+
+
+
+exports.getUsers = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || "";
+    const sortBy = req.query.sortBy || "fullname";
+    const order = req.query.order === "desc" ? -1 : 1;
+
+    const query = {
+      $or: [
+        { fullname: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ]
+    };
+
+    const totalUsers = await User.countDocuments(query);
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    const users = await User.find(query)
+      .sort({ [sortBy]: order })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select("fullname email phone balances status photo");
+
+    res.json({
+      users,
+      totalPages,
+      currentPage: page,
+      totalUsers
+    });
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+// PUT /api/admin/users/:id
+exports.updateUser = async (req, res) => {
+  try {
+    const { fullname, email, phone, status } = req.body;
+    const updateData = { fullname, email, phone, status };
+
+    // Handle profile picture if uploaded
+    if (req.file) updateData.photo = req.file.filename;
+
+    const updatedUser = await User.findByIdAndUpdate(req.params.id, updateData, { new: true });
+
+    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+
+    res.json({ message: "User updated successfully", user: updatedUser });
+  } catch (err) {
+    console.error("Error updating user:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+exports.resetUserPin = async (req, res) => {
+  try {
+    const newPin = req.body.pin || Math.floor(1000 + Math.random() * 9000).toString(); // random 4-digit PIN
+    const hashedPin = await bcrypt.hash(newPin, 10);
+
+    await User.findByIdAndUpdate(req.params.id, { transactionPin: hashedPin });
+
+    res.json({ message: "Transaction PIN reset successfully", newPin }); // optional: send new PIN to admin
+  } catch (err) {
+    console.error("Error resetting PIN:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.fundUser = async (req, res) => {
+  try {
+    const { accountType, amount, description, date } = req.body;
+    if (!["savings", "current"].includes(accountType))
+      return res.status(400).json({ message: "Invalid account type" });
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Update balance
+    user.balances[accountType] += parseFloat(amount);
+    await user.save();
+
+    // Create transaction record
+    const transaction = new Transaction({
+      user: user._id,
+      type: "Credit",
+      account: accountType,
+      amount,
+      description,
+      date: date || new Date(),
+      status: "Success"
+    });
+    await transaction.save();
+
+    res.json({ message: `Funded ₦${amount} to ${accountType} successfully`, transaction });
+  } catch (err) {
+    console.error("Error funding user:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

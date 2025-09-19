@@ -8,15 +8,43 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   savingsAccountNumber: { type: String, unique: true },
   currentAccountNumber: { type: String, unique: true },
+  photo: { type: String, default: "" },
+
+  balances: {
+    savings: { type: Number, default: 0 },
+    current: { type: Number, default: 0 },
+    loan: { type: Number, default: 0 },
+    inflow: { type: Number, default: 0 },
+    outflow: { type: Number, default: 0 },
+  },
+
+  transactionPin: {
+    type: String, // will store hashed PIN
+    select: false // don’t return it by default in queries
+  },
+
   resetToken: String,
   resetTokenExpiry: Date,
 });
 
-// hash password before save
+// 🔑 Hash password & transaction PIN before save
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-  this.password = await bcrypt.hash(this.password, 10);
+  // Hash password
+  if (this.isModified("password")) {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+
+  // Hash transaction PIN
+  if (this.isModified("transactionPin")) {
+    this.transactionPin = await bcrypt.hash(this.transactionPin, 10);
+  }
+
   next();
 });
+
+// 🔑 Compare PIN
+userSchema.methods.matchPin = async function (enteredPin) {
+  return await bcrypt.compare(enteredPin, this.transactionPin);
+};
 
 module.exports = mongoose.model("User", userSchema);

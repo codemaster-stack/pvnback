@@ -3,20 +3,19 @@ require("dotenv").config();
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const connectDB = require("./config/db"); // import db connection
+const connectDB = require("./config/db"); 
 const adminAuthRoutes = require("./routes/adminAuthRoutes");
 const errorHandler = require("./middleware/errorHandler");
 const userRoutes = require("./routes/userRoutes");
 const contactRoutes = require("./routes/contactRoutes");
 const publicLoanRoutes = require("./routes/publicLoanRoutes");
+const transactionRoutes = require("./routes/transactionRoutes");
 
 const path = require("path");
-const http = require("http"); // ✅ needed for socket.io
+const http = require("http");
 const { Server } = require("socket.io");
 
 dotenv.config();
-
-// Connect Database
 connectDB();
 
 const app = express();
@@ -36,45 +35,50 @@ app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/public/loans", publicLoanRoutes);
+app.use("/uploads", express.static("uploads"));
+app.use("/api/users", transactionRoutes);
+
 
 app.use(express.static(path.join(__dirname, "frontend")));
 
-// Error Handler
+// Error handler
 app.use(errorHandler);
 
-// ✅ Create HTTP server & attach Socket.IO
+// --- Socket.IO setup ---
 const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
     origin: ["https://www.pvbonline.online", "https://pvbonline.online"],
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
-// ✅ Socket.IO events
 io.on("connection", (socket) => {
-  console.log("⚡ New client connected:", socket.id);
+  console.log("🔌 New client connected:", socket.id);
 
-  // User sends a message
-  socket.on("userMessage", (msg) => {
-    console.log("💬 User:", msg);
-    // Forward to admin(s)
-    io.emit("adminMessage", msg);
+  socket.on("joinAdmin", (adminId) => {
+    socket.join("admins");
+    console.log(`Admin ${adminId} joined`);
   });
 
-  // Admin sends a reply
-  socket.on("adminMessage", (msg) => {
-    console.log("🛠️ Admin:", msg);
-    // Forward to users
-    io.emit("userMessage", msg);
+  socket.on("visitorMessage", (data) => {
+    console.log("Visitor message:", data);
+    // send to admins
+    io.to("admins").emit("chatMessage", { sender: "visitor", ...data });
+  });
+
+  socket.on("adminMessage", ({ visitorId, text }) => {
+    console.log(`Admin replying to ${visitorId}:`, text);
+    io.to(visitorId).emit("chatMessage", { sender: "admin", text });
   });
 
   socket.on("disconnect", () => {
-    console.log("❌ Client disconnected:", socket.id);
+    console.log("❌ Client disconnected", socket.id);
   });
 });
 
-// ✅ Start server
+// --- Start server ---
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
