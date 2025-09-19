@@ -383,12 +383,13 @@ exports.getMe = async (req, res) => {
   try {
     if (!req.user) return res.status(404).json({ message: "User not found" });
 
-    const { name, email, profilePic } = req.user;
-    res.json({ name, email, profilePic });
+    const { fullname, email, profilePic, balances } = req.user; 
+    res.json({ fullname, email, profilePic, balances });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // controllers/userController.js
 exports.updateProfilePicture = async (req, res) => {
