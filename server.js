@@ -33,16 +33,16 @@ app.use(
 
 
 // Fix preflight CORS issues on Render
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", ["https://www.pvbonline.online", "https://pvbonline.online"]);
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Credentials", "true");
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  next();
-});
+// app.use((req, res, next) => {
+//   res.header("Access-Control-Allow-Origin", ["https://www.pvbonline.online", "https://pvbonline.online"]);
+//   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+//   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+//   res.header("Access-Control-Allow-Credentials", "true");
+//   if (req.method === "OPTIONS") {
+//     return res.sendStatus(200);
+//   }
+//   next();
+// });
 
 
 // Routes
