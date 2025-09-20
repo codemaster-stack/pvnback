@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 const sendEmail = require("../utils/sendEmail");
 const CreditCard = require("../models/creditCardModel");
 const Transaction = require("../models/Transaction");
-
+const path = require("path");
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
@@ -416,11 +416,16 @@ exports.updateProfilePicture = async (req, res) => {
     if (!req.user) return res.status(404).json({ message: "User not found" });
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-    req.user.profilePic = req.file.path; // store file path in DB
+    // Always save with forward slashes
+    req.user.profilePic = `uploads/profiles/${req.file.filename}`;
     await req.user.save();
 
-    res.json({ message: "Profile picture updated", profilePic: req.user.profilePic });
+    res.json({
+      message: "Profile picture updated",
+      profilePic: req.user.profilePic,
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Profile picture update error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

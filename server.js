@@ -40,6 +40,7 @@ app.use("/api/users", transactionRoutes);
 
 
 app.use(express.static(path.join(__dirname, "frontend")));
+app.use("/uploads", express.static("uploads"));
 
 // Error handler
 app.use(errorHandler);

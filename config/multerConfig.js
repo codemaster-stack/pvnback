@@ -1,17 +1,23 @@
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
-// Storage setup
+// Ensure the folder exists
+const uploadPath = path.join(__dirname, "../uploads/profiles");
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/"); // save in uploads folder
+    cb(null, uploadPath); // save in uploads/profiles
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+    // Replace spaces to avoid broken URLs
+    cb(null, Date.now() + "_" + file.originalname.replace(/\s+/g, "_"));
   },
 });
 
-// File filter (accept images only)
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
