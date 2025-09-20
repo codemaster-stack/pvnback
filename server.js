@@ -11,6 +11,7 @@ const contactRoutes = require("./routes/contactRoutes");
 const publicLoanRoutes = require("./routes/publicLoanRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
 
+
 const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -30,13 +31,27 @@ app.use(
   })
 );
 
+
+// Fix preflight CORS issues on Render
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", ["https://www.pvbonline.online", "https://pvbonline.online"]);
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+
 // Routes
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/public/loans", publicLoanRoutes);
 app.use("/uploads", express.static("uploads"));
-app.use("/api/users", transactionRoutes);
+app.use("/api/transaction", transactionRoutes);
 
 
 app.use(express.static(path.join(__dirname, "frontend")));

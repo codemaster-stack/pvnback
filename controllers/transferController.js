@@ -128,70 +128,112 @@ const { Parser } = require("json2csv");
 // @desc    Transfer funds
 // @route   POST /api/transactions/transfer
 // @access  Private
+// controllers/transactionController.js
+
 exports.transfer = async (req, res) => {
   try {
-    const { amount, accountNumber, recipientBank, recipientCountry, description, fromAccountType, toAccountType, pin } = req.body;
+    const {
+      amount,
+      accountNumber,
+      recipientBank,
+      recipientCountry,
+      description,
+      fromAccountType,
+      toAccountType,
+      pin
+    } = req.body;
 
-    // Validate inputs
+    // --- 1. Validate amount ---
     if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
-    }
-    if (!fromAccountType || !toAccountType) {
-      return res.status(400).json({ message: "Both account types are required" });
+      return res.status(400).json({ message: "Invalid transfer amount" });
     }
 
-    // Find sender
+    // --- 2. Validate account types ---
+    const validTypes = ["savings", "current"];
+    if (
+      !validTypes.includes(fromAccountType) ||
+      !validTypes.includes(toAccountType)
+    ) {
+      return res.status(400).json({ message: "Invalid account type" });
+    }
+
+    // --- 3. Find sender ---
     const sender = await User.findById(req.user.id).select("+transactionPin");
-    if (!sender) return res.status(404).json({ message: "Sender not found" });
-
-    // Verify PIN
-    const isMatch = await sender.matchPin(pin);
-    if (!isMatch) return res.status(400).json({ message: "Invalid PIN" });
-
-    // Check sender balance
-    if (sender.balances[fromAccountType] < amount) {
-      return res.status(400).json({ message: "Insufficient balance in " + fromAccountType });
+    if (!sender) {
+      return res.status(404).json({ message: "Sender not found" });
     }
 
-    // Find recipient
+    // --- 4. Verify PIN ---
+    const isMatch = await sender.matchPin(pin);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid PIN" });
+    }
+
+    // --- 5. Check sender balance ---
+    if (sender.balances[fromAccountType] < amount) {
+      return res.status(400).json({
+        message: `Insufficient balance in ${fromAccountType}`
+      });
+    }
+
+    // --- 6. Find recipient ---
     const recipient = await User.findOne({
       $or: [
         { savingsAccountNumber: accountNumber },
         { currentAccountNumber: accountNumber }
       ]
     });
-    if (!recipient) return res.status(404).json({ message: "Recipient not found" });
+    if (!recipient) {
+      return res.status(404).json({ message: "Recipient not found" });
+    }
 
-    // Debit sender
+    // --- 7. Debit sender & credit recipient ---
     sender.balances[fromAccountType] -= amount;
     sender.balances.outflow += amount;
 
-    // Credit recipient
     recipient.balances[toAccountType] += amount;
     recipient.balances.inflow += amount;
 
     await sender.save();
     await recipient.save();
 
-    // Save transaction logs
+    // --- 8. Save transaction logs ---
     await Transaction.create({
       userId: sender._id,
       type: "outflow",
       amount,
-      description: description || `Transfer to ${accountNumber} (${recipientBank})`
+      description:
+        description ||
+        `Transfer to ${accountNumber} (${recipientBank}, ${recipientCountry})`,
+      fromAccountType,
+      toAccountType,
+      accountNumber,
+      balanceAfter: sender.balances[fromAccountType]
     });
 
     await Transaction.create({
       userId: recipient._id,
       type: "inflow",
       amount,
-      description: description || `Transfer from ${sender.fullname}`
+      description:
+        description || `Transfer from ${sender.fullname}`,
+      fromAccountType,
+      toAccountType,
+      accountNumber: fromAccountType === "savings"
+        ? sender.savingsAccountNumber
+        : sender.currentAccountNumber,
+      balanceAfter: recipient.balances[toAccountType]
     });
 
-    // ✅ Return updated balances to frontend
+    // --- 9. Mask recipient account for frontend message ---
+    const masked =
+      accountNumber.slice(0, 4) + "****" + accountNumber.slice(-2);
+
+    // --- 10. Send success response ---
     res.json({
       message: "✅ Transfer successful",
-      balances: sender.balances
+      balances: sender.balances,
+      recipientMasked: masked
     });
 
   } catch (err) {

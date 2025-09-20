@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const fs = require("fs");
 const router = express.Router();
 const { protect } = require("../middleware/auth");
 
@@ -20,7 +21,6 @@ const {
 } = require("../controllers/userController");
 
 // Multer setup
-const fs = require("fs");
 const uploadPath = "./uploads/profiles";
 if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
 
@@ -37,19 +37,20 @@ router.post("/forgot", forgotPassword);
 router.post("/reset", resetPassword);
 
 // Protected routes
-router.use(protect); // all routes below require authentication
+router.use(protect);
 
 router.post("/create-card", createCreditCard);
 router.get("/dashboard", getDashboard);
 router.get("/transactions", getTransactions);
-router.get("/users/has-pin", hasPin);
-router.post("/users/create-pin", createPin);
+
+// FIX: remove extra `/users` prefix
+router.get("/has-pin", hasPin);
+router.post("/create-pin", createPin);
 router.post("/forgot-pin", forgotPin);
 router.post("/reset-pin", resetPin);
 
 // User info & profile picture
 router.get("/me", getMe);
 router.put("/profile-picture", upload.single("profilePic"), updateProfilePicture);
-
 
 module.exports = router;
